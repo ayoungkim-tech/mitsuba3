@@ -73,7 +73,7 @@ on [readthedocs][2].
 We provide pre-compiled binary wheels via PyPI. Installing Mitsuba this way is as simple as running
 
 ```bash
-pip install mitsuba
+pip install mitsuba --break-system-packages
 ```
 
 on the command line. The Python package includes thirteen variants by default:
