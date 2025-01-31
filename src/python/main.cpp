@@ -92,8 +92,9 @@ NB_MODULE(mitsuba_ext, m) {
              * its reference counting mechanism. This leaks memory on interpreter shutdown.
              * However, this should only affect static, thread local objects, for which
              * enforcing an orderly shutdown is difficult. */
-            if (!ready_flag)
+            if (!ready_flag && (Thread::thread() != Thread::get_main_thread()))
                 return;
+
             nb::gil_scoped_acquire guard;
             Py_DECREF(o);
         }

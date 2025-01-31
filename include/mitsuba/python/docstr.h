@@ -9024,6 +9024,12 @@ spawn further parallel pieces of work).)doc";
 
 static const char *__doc_mitsuba_TShapeKDTree_BuildTask_BuildTask = R"doc()doc";
 
+static const char *__doc_mitsuba_TShapeKDTree_BuildTask_FTZGuard = R"doc()doc";
+
+static const char *__doc_mitsuba_TShapeKDTree_BuildTask_FTZGuard_FTZGuard = R"doc()doc";
+
+static const char *__doc_mitsuba_TShapeKDTree_BuildTask_FTZGuard_csr = R"doc()doc";
+
 static const char *__doc_mitsuba_TShapeKDTree_BuildTask_build_nlogn = R"doc(Recursively run the O(N log N builder))doc";
 
 static const char *__doc_mitsuba_TShapeKDTree_BuildTask_execute = R"doc(Run one iteration of min-max binning and spawn recursive tasks)doc";
@@ -9600,6 +9606,8 @@ static const char *__doc_mitsuba_Thread_exit = R"doc(Exit the thread, should be 
 static const char *__doc_mitsuba_Thread_file_resolver = R"doc(Return the file resolver associated with the current thread)doc";
 
 static const char *__doc_mitsuba_Thread_file_resolver_2 = R"doc(Return the parent thread (const version))doc";
+
+static const char *__doc_mitsuba_Thread_get_main_thread = R"doc(Return the main thread)doc";
 
 static const char *__doc_mitsuba_Thread_has_initialized_thread = R"doc(Return whether the current thread data structure has been initialized.)doc";
 
@@ -10217,6 +10225,10 @@ static const char *__doc_mitsuba_detail_CIE1932Tables_xyz = R"doc(CIE 1931 XYZ c
 static const char *__doc_mitsuba_detail_ConcurrentVector = R"doc()doc";
 
 static const char *__doc_mitsuba_detail_ConcurrentVector_ConcurrentVector = R"doc()doc";
+
+static const char *__doc_mitsuba_detail_ConcurrentVector_ConcurrentVector_2 = R"doc()doc";
+
+static const char *__doc_mitsuba_detail_ConcurrentVector_ConcurrentVector_3 = R"doc()doc";
 
 static const char *__doc_mitsuba_detail_ConcurrentVector_grow_by = R"doc()doc";
 

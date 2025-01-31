@@ -186,6 +186,12 @@ Thread* Thread::thread() {
     return self_val;
 }
 
+Thread* Thread::get_main_thread() {
+    Thread *main_val = main_thread;
+    assert(main_val);
+    return main_val;
+}
+
 bool Thread::has_initialized_thread() {
     return self != nullptr;
 }

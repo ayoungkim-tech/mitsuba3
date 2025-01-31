@@ -374,6 +374,15 @@ if (MSVC)
 
   # Don't complain about incompatible modifier on explicit instantiations
   add_compile_options(/wd4910)
+
+  # Ensure source and execution charset is encoded as UTF-8
+  add_compile_options(/utf-8)
+
+  # Workaround to avoid a particular crash due to MS VC++ runtime library binary 
+  # incompatibility. In general the runtime version needs to be at least as new 
+  # as toolset version but this define provides one such "escape hatch" if that 
+  # strictly isn't the case to combat against a commonly encountered reported crash
+  add_compile_options(-D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
 endif()
 
 include(TestBigEndian)
@@ -502,6 +511,14 @@ endif()
 
 if (NOT SKBUILD)
   list(APPEND MI_DEPEND nanothread)
+
+  if (MI_ENABLE_JIT)
+    list(APPEND MI_DEPEND drjit-core)
+  endif()
+
+  if (MI_ENABLE_AUTODIFF)
+    list(APPEND MI_DEPEND drjit-extra)
+  endif()
 endif()
 
 # Copy shared libraries to Python folders (no rpath on Windows)

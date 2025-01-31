@@ -132,6 +132,9 @@ public:
     /// Return the current thread
     static Thread *thread();
 
+    /// Return the main thread
+    static Thread *get_main_thread();
+
     /// Return whether the current thread data structure has been initialized.
     static bool has_initialized_thread();
 
