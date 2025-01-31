@@ -2,6 +2,9 @@
 *.sublime-project
 *.sublime-workspace
 
+# Tutorial
+tutorials
+
 # VS & VSCode
 /.vscode
 /.vs
