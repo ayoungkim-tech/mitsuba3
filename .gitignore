@@ -3,7 +3,7 @@
 *.sublime-workspace
 
 # Tutorial
-tutorials
+tutorials/
 
 # VS & VSCode
 /.vscode
