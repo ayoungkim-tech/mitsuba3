@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include <drjit/array.h>
+#include <drjit/array_traverse.h>
 namespace dr = drjit;
 
 NAMESPACE_BEGIN(mitsuba)
@@ -42,6 +43,7 @@ struct field<DeviceType, HostType,
     field(const DeviceType &v) : m_scalar(v) { }
     field(DeviceType &&v) : m_scalar(v) { }
     const DeviceType& value()  const { return m_scalar; }
+    DeviceType& value() { return m_scalar; }
     const DeviceType& scalar() const { return m_scalar; }
     DeviceType* ptr() { return &m_scalar; }
     field& operator=(const field& f) {
@@ -62,6 +64,12 @@ struct field<DeviceType, HostType,
     }
 private:
     DeviceType m_scalar;
+
+public:
+    void traverse_1_cb_ro(void * /*payload*/,
+                          drjit::detail::traverse_callback_ro) const {}
+    void traverse_1_cb_rw(void * /*payload*/,
+                          drjit::detail::traverse_callback_rw) {}
 };
 
 template <typename DeviceType, typename HostType>
@@ -71,6 +79,7 @@ struct field<DeviceType, HostType,
     field(const HostType &v) : m_value(v), m_scalar(v) { }
     field(HostType &&v) : m_value(v), m_scalar(v) { }
     const DeviceType& value()  const { return m_value; }
+    DeviceType& value()  { return m_value; }
     const HostType& scalar() const { return m_scalar; }
     DeviceType* ptr() { return &m_value; }
     field& operator=(const field& f) {
@@ -105,6 +114,16 @@ struct field<DeviceType, HostType,
 private:
     DeviceType m_value;
     HostType m_scalar;
+
+public:
+    void traverse_1_cb_ro(void *payload,
+                          drjit::detail::traverse_callback_ro fn) const {
+        drjit ::traverse_1_fn_ro(m_value, payload, fn);
+    }
+    void traverse_1_cb_rw(void *payload,
+                          drjit::detail::traverse_callback_rw fn) {
+        drjit ::traverse_1_fn_rw(m_value, payload, fn);
+    }
 };
 
 /// Prints the canonical string representation of a field
@@ -113,6 +132,19 @@ std::ostream &operator<<(std::ostream &os,
                          const field<DeviceType, HostType> &f) {
     os << f.scalar();
     return os;
+}
+
+/// Implementation of TraversalCallback::put() for field<> objects
+/// This is defined here to avoid circular dependencies
+template <typename DeviceType, typename HostType, typename SFINAE,
+          typename Flags>
+void TraversalCallback::put(
+    std::string_view name,
+    mitsuba::field<DeviceType, HostType, SFINAE> &value,
+    Flags flags) {
+
+    // Use the device version
+    put(name, value.value(), flags);
 }
 
 NAMESPACE_END(mitsuba)

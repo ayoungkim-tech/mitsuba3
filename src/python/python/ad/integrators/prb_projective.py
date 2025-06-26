@@ -163,6 +163,15 @@ class PathProjectiveIntegrator(PSIntegrator):
         η = mi.Float(1)                               # Index of refraction
         active = mi.Bool(active)                      # Active SIMD lanes
         depth_init = mi.UInt32(depth)                 # Initial depth
+        pi = dr.zeros(mi.PreliminaryIntersection3f)
+
+        if dr.hint(ignore_ray, mode='scalar'):
+            si = si_shade
+        else:
+            pi = scene.ray_intersect_preliminary(ray,
+                                                 coherent=True,
+                                                 reorder=False,
+                                                 active=active)
 
         # Variables caching information
         prev_si         = dr.zeros(mi.SurfaceInteraction3f)
@@ -180,14 +189,13 @@ class PathProjectiveIntegrator(PSIntegrator):
             active_next = mi.Bool(active)
 
             # Compute a surface interaction that tracks derivatives arising
-            # from differentiable shape parameters (position, normals, etc).
+            # from differentiable shape parameters (position, normals, etc.)
             # In primal mode, this is just an ordinary ray tracing operation.
             use_si_shade = ignore_ray & (depth == depth_init)
             with dr.resume_grad(when=not primal):
-                si = scene.ray_intersect(ray,
-                                         ray_flags=mi.RayFlags.All,
-                                         coherent=(depth == 0),
-                                         active=active_next & ~use_si_shade)
+                si = pi.compute_surface_interaction(ray,
+                                                    ray_flags=mi.RayFlags.All,
+                                                    active=active_next & ~use_si_shade)
             if dr.hint(ignore_ray, mode='scalar'):
                 si[use_si_shade] = si_shade
 
@@ -373,6 +381,11 @@ class PathProjectiveIntegrator(PSIntegrator):
             depth[si.is_valid()] += 1
             active = active_next
 
+            pi = scene.ray_intersect_preliminary(ray,
+                                                 coherent=False,
+                                                 reorder=dr.flag(dr.JitFlag.LoopRecord),
+                                                 active=active)
+
         return (
             L if primal else δL, # Radiance/differential radiance
             depth != 0,          # Ray validity flag for alpha blending
@@ -382,7 +395,7 @@ class PathProjectiveIntegrator(PSIntegrator):
         )
 
 
-    def sample_radiance_difference(self, scene, ss, curr_depth, sampler, active):
+    def sample_radiance_difference(self, scene, ss, curr_depth, sampler, wavelengths, active):
         """
         See ``PSIntegrator.sample_radiance_difference()`` for a description of
         this interface and the role of the various parameters and return values.
@@ -390,10 +403,7 @@ class PathProjectiveIntegrator(PSIntegrator):
 
         # ----------- Estimate the radiance of the background -----------
 
-        ray_bg = mi.Ray3f(
-            ss.p + (1 + dr.max(dr.abs(ss.p))) * (ss.d * ss.offset + ss.n * mi.math.ShapeEpsilon),
-            ss.d
-        )
+        ray_bg = ss.spawn_ray(wavelengths)
         radiance_bg, _, _, _ = self.sample(
             dr.ADMode.Primal, scene, sampler, ray_bg, curr_depth, None, None, active, False, None)
 
@@ -409,6 +419,7 @@ class PathProjectiveIntegrator(PSIntegrator):
         # Create a dummy ray that we never perform ray-intersection with to
         # compute other fields in ``si``
         dummy_ray = mi.Ray3f(ss.p - ss.d, ss.d)
+        ray_bg.wavelengths = wavelengths
 
         # The ray origin is wrong, but this is fine if we only need the primal
         # radiance
@@ -443,25 +454,30 @@ class PathProjectiveIntegrator(PSIntegrator):
 
 
     @dr.syntax
-    def sample_importance(self, scene, sensor, ss, max_depth, sampler, preprocess, active):
+    def sample_importance(self, scene, sensor, ss, max_depth, sampler,
+                          wavelengths, preprocess, active):
         """
         See ``PSIntegrator.sample_importance()`` for a description of this
         interface and the role of the various parameters and return values.
         """
 
         # Trace a ray to the sensor end of the boundary segment
-        ray_boundary = mi.Ray3f(
-            ss.p + (1 + dr.max(dr.abs(ss.p))) * (-ss.d * ss.offset + ss.n * mi.math.ShapeEpsilon),
-            -ss.d
-        )
+        ss_importance = mi.SilhouetteSample3f(ss)
+        ss_importance.d = -ss_importance.d
+        ray_boundary = ss_importance.spawn_ray(wavelengths)
         if dr.hint(preprocess, mode='scalar'):
-            si_boundary = scene.ray_intersect(ray_boundary, active=active)
+            si_boundary = scene.ray_intersect(ray_boundary,
+                                              ray_flags=mi.RayFlags.All,
+                                              coherent=False,
+                                              reorder=True,
+                                              active=active)
         else:
             with dr.resume_grad():
                 si_boundary = scene.ray_intersect(
                     ray_boundary,
                     ray_flags=mi.RayFlags.All | mi.RayFlags.FollowShape,
                     coherent=False,
+                    reorder=True,
                     active=active)
         active = active & si_boundary.is_valid()
 
@@ -523,7 +539,11 @@ class PathProjectiveIntegrator(PSIntegrator):
 
             # Get the next surface interaction
             ray_next = si_loop.spawn_ray(wo_bsdf_world)
-            si_loop[active_loop] = scene.ray_intersect(ray_next, active_loop)
+            si_loop[active_loop] = scene.ray_intersect(ray_next,
+                                                       ray_flags=mi.RayFlags.All,
+                                                       coherent=False,
+                                                       reorder=dr.flag(dr.JitFlag.LoopRecord),
+                                                       active=active_loop)
 
             # Update the active lanes
             active_loop &= si_loop.is_valid()

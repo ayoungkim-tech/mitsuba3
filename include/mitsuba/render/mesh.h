@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <drjit/dynamic.h>
+#include <drjit/array_traverse.h>
 
 NAMESPACE_BEGIN(mitsuba)
 
@@ -182,6 +183,9 @@ public:
 
     /// Does this mesh use face normals?
     bool has_face_normals() const { return m_face_normals; }
+
+    /// Does this shape have flipped normals?
+    bool has_flipped_normals() const override { return m_flip_normals; }
 
     /// @}
     // =========================================================================
@@ -487,7 +491,7 @@ protected:
         return { t, { u, v }, active };
     }
 
-    MI_DECLARE_CLASS()
+    MI_DECLARE_CLASS(Mesh)
 
 protected:
     enum MeshAttributeType {
@@ -502,6 +506,8 @@ protected:
         MeshAttribute migrate(AllocType at) const {
             return MeshAttribute { size, type, dr::migrate(buf, at) };
         }
+
+        DRJIT_STRUCT_NODEF(MeshAttribute, buf);
     };
 
     template <uint32_t Size, bool Raw>
@@ -598,6 +604,10 @@ protected:
 
     /// Pointer to the scene that owns this mesh
     Scene<Float, Spectrum>* m_scene = nullptr;
+
+    MI_DECLARE_TRAVERSE_CB(m_vertex_positions, m_vertex_normals,
+                           m_vertex_texcoords, m_faces, m_E2E, m_sil_dedge_pmf,
+                           m_mesh_attributes, m_area_pmf, m_parameterization)
 };
 
 MI_EXTERN_CLASS(Mesh)
@@ -624,7 +634,7 @@ DRJIT_CALL_TEMPLATE_INHERITED_BEGIN(mitsuba::Mesh, mitsuba::Shape)
     DRJIT_CALL_GETTER(has_vertex_texcoords)
     DRJIT_CALL_GETTER(has_mesh_attributes)
     DRJIT_CALL_GETTER(has_face_normals)
-DRJIT_CALL_INHERITED_END(mitsuba::Mesh)
+DRJIT_CALL_END()
 
 //! @}
 // -----------------------------------------------------------------------

@@ -263,12 +263,9 @@ template <typename Float, typename Spectrum> struct BSDFSample3 {
  * \sa mitsuba.BSDFSample3f
  */
 template <typename Float, typename Spectrum>
-class MI_EXPORT_LIB BSDF : public Object {
+class MI_EXPORT_LIB BSDF : public JitObject<BSDF<Float, Spectrum>> {
 public:
     MI_IMPORT_TYPES(Texture)
-
-    /// Destructor
-    ~BSDF();
 
     /**
      * \brief Importance sample the BSDF model
@@ -566,12 +563,6 @@ public:
         return m_components.size();
     }
 
-    /// Return a string identifier
-    std::string id() const override { return m_id; }
-
-    /// Set a string identifier
-    void set_id(const std::string& id) override { m_id = id; };
-
     /**
      * \brief Evaluate the diffuse reflectance
      *
@@ -589,13 +580,28 @@ public:
     virtual Spectrum eval_diffuse_reflectance(const SurfaceInteraction3f &si,
                                               Mask active = true) const;
 
+    /**
+     * \brief Returns the shading frame accounting for any pertubations that may 
+     * performed by the BSDF during evaluation.
+     *
+     * \param si
+     *     Surface interaction associated with the query
+     *
+     * \return
+     *     The perturbed shading frame. By default simply returns the surface
+     *     interaction shading frame.
+     */
+    virtual Frame3f sh_frame(const SurfaceInteraction3f &si, Mask /*active*/) const {
+        return si.sh_frame;
+    }
+
     /// Return a human-readable representation of the BSDF
     std::string to_string() const override = 0;
 
     //! @}
     // -----------------------------------------------------------------------
 
-    MI_DECLARE_CLASS()
+    MI_DECLARE_PLUGIN_BASE_CLASS(BSDF)
 
 protected:
     BSDF(const Properties &props);
@@ -607,8 +613,7 @@ protected:
     /// Flags for each component of this BSDF.
     std::vector<uint32_t> m_components;
 
-    /// Identifier (if available)
-    std::string m_id;
+    MI_TRAVERSE_CB(Object);
 };
 
 // -----------------------------------------------------------------------
@@ -651,10 +656,10 @@ MI_EXTERN_CLASS(BSDF)
 NAMESPACE_END(mitsuba)
 
 // -----------------------------------------------------------------------
-//! @{ \name Dr.Jit support for vectorized function calls
+//! @{ \name Enables vectorized method calls on Dr.Jit arrays of BSDFs
 // -----------------------------------------------------------------------
 
-MI_CALL_TEMPLATE_BEGIN(BSDF)
+DRJIT_CALL_TEMPLATE_BEGIN(mitsuba::BSDF)
     DRJIT_CALL_METHOD(sample)
     DRJIT_CALL_METHOD(eval)
     DRJIT_CALL_METHOD(eval_null_transmission)
@@ -666,11 +671,10 @@ MI_CALL_TEMPLATE_BEGIN(BSDF)
     DRJIT_CALL_METHOD(eval_attribute)
     DRJIT_CALL_METHOD(eval_attribute_1)
     DRJIT_CALL_METHOD(eval_attribute_3)
+    DRJIT_CALL_METHOD(sh_frame)
     DRJIT_CALL_GETTER(flags)
-    auto needs_differentials() const {
-        return has_flag(flags(), mitsuba::BSDFFlags::NeedsDifferentials);
-    }
-MI_CALL_TEMPLATE_END(BSDF)
+    auto needs_differentials() const { return has_flag(flags(), mitsuba::BSDFFlags::NeedsDifferentials); }
+DRJIT_CALL_END()
 
 //! @}
 // -----------------------------------------------------------------------

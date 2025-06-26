@@ -18,7 +18,8 @@
 
 NAMESPACE_BEGIN(mitsuba)
 
-MI_VARIANT Shape<Float, Spectrum>::Shape(const Properties &props) : m_id(props.id()) {
+MI_VARIANT Shape<Float, Spectrum>::Shape(const Properties &props)
+    : JitObject<Shape>(props.id()) {
     m_to_world =
         (ScalarTransform4f) props.get<ScalarTransform4f>("to_world", ScalarTransform4f());
     m_to_object = m_to_world.scalar().inverse();
@@ -65,13 +66,11 @@ MI_VARIANT Shape<Float, Spectrum>::Shape(const Properties &props) : m_id(props.i
     if (!m_bsdf) {
         Properties props2("diffuse");
         if (m_emitter)
-            props2.set_float("reflectance", 0);
+            props2.set("reflectance", 0.f);
         m_bsdf = PluginManager::instance()->create_object<BSDF>(props2);
     }
 
     m_silhouette_sampling_weight = props.get<ScalarFloat>("silhouette_sampling_weight", 1.0f);
-
-    MI_REGISTRY_PUT("Shape", this);
 }
 
 MI_VARIANT Shape<Float, Spectrum>::~Shape() {
@@ -79,10 +78,8 @@ MI_VARIANT Shape<Float, Spectrum>::~Shape() {
     if constexpr (dr::is_cuda_v<Float>)
         jit_free(m_optix_data_ptr);
 #endif
-
-    if constexpr (dr::is_jit_v<Float>)
-        jit_registry_remove(this);
 }
+
 
 MI_VARIANT typename Shape<Float, Spectrum>::PositionSample3f
 Shape<Float, Spectrum>::sample_position(Float /*time*/, const Point2f & /*sample*/,
@@ -321,21 +318,18 @@ MI_VARIANT
 void Shape<Float, Spectrum>::optix_fill_hitgroup_records(
     std::vector<HitGroupSbtRecord> &hitgroup_records,
     const OptixProgramGroup *program_groups,
-    const std::unordered_map<size_t, size_t> &program_index_mapping) {
+    const OptixProgramGroupMapping &pg_mapping) {
 
     optix_prepare_geometry();
-    // Set hitgroup record data
-    hitgroup_records.push_back(HitGroupSbtRecord());
-    hitgroup_records.back().data = {
-        jit_registry_id(this), m_optix_data_ptr
-    };
 
-    size_t shape_index = (is_mesh() ? 1 : 2 + get_shape_descr_idx(this));
-    size_t program_group_idx = program_index_mapping.at(shape_index);
+    HitGroupSbtRecord rec{ { jit_registry_id(this), m_optix_data_ptr } };
+    uint32_t pg_index = pg_mapping.at((ShapeType) shape_type());
 
     // Setup the hitgroup record and copy it to the hitgroup records array
-    jit_optix_check(optixSbtRecordPackHeader(program_groups[program_group_idx],
-                                             &hitgroup_records.back()));
+    jit_optix_check(optixSbtRecordPackHeader(program_groups[pg_index], &rec));
+
+    // Set hitgroup record data
+    hitgroup_records.push_back(rec);
 }
 
 MI_VARIANT void Shape<Float, Spectrum>::optix_prepare_ias(const OptixDeviceContext& /*context*/,
@@ -588,6 +582,16 @@ Shape<Float, Spectrum>::eval_attribute_3(const std::string& name,
     return texture->eval_3(si, active);
 }
 
+MI_VARIANT typename dr::DynamicArray<Float>
+Shape<Float, Spectrum>::eval_attribute_x(const std::string& /*name*/,
+                                         const SurfaceInteraction3f & /*si*/,
+                                         Mask /*active*/) const {
+    if constexpr (dr::is_jit_v<Float>)
+        return 0.f;
+    else
+        NotImplementedError("eval_attribute_x");
+}
+
 MI_VARIANT Float Shape<Float, Spectrum>::surface_area() const {
     NotImplementedError("surface_area");
 }
@@ -619,32 +623,41 @@ Shape<Float, Spectrum>::effective_primitive_count() const {
     return primitive_count();
 }
 
-MI_VARIANT void Shape<Float, Spectrum>::traverse(TraversalCallback *callback) {
-    callback->put_object("bsdf", m_bsdf.get(), +ParamFlags::Differentiable);
-    if (m_emitter)
-        callback->put_object("emitter",         m_emitter.get(),         +ParamFlags::Differentiable);
-    if (m_sensor)
-        callback->put_object("sensor",          m_sensor.get(),          +ParamFlags::Differentiable);
-    if (m_interior_medium)
-        callback->put_object("interior_medium", m_interior_medium.get(), +ParamFlags::Differentiable);
-    if (m_exterior_medium)
-        callback->put_object("exterior_medium", m_exterior_medium.get(), +ParamFlags::Differentiable);
+MI_VARIANT bool Shape<Float, Spectrum>::has_flipped_normals() const {
+    return false;
+}
 
-    callback->put_parameter("silhouette_sampling_weight", m_silhouette_sampling_weight, +ParamFlags::NonDifferentiable);
+MI_VARIANT void Shape<Float, Spectrum>::traverse(TraversalCallback *cb) {
+    cb->put("bsdf", m_bsdf, ParamFlags::Differentiable);
+    if (m_emitter)
+        cb->put("emitter",         m_emitter,         ParamFlags::Differentiable);
+    if (m_sensor)
+        cb->put("sensor",          m_sensor,          ParamFlags::Differentiable);
+    if (m_interior_medium)
+        cb->put("interior_medium", m_interior_medium, ParamFlags::Differentiable);
+    if (m_exterior_medium)
+        cb->put("exterior_medium", m_exterior_medium, ParamFlags::Differentiable);
+
+    cb->put("silhouette_sampling_weight", m_silhouette_sampling_weight, ParamFlags::NonDifferentiable);
+
+    for (auto& [name, texture]: m_texture_attributes)
+        cb->put(name, texture, ParamFlags::Differentiable);
 }
 
 MI_VARIANT
 void Shape<Float, Spectrum>::parameters_changed(const std::vector<std::string> &/*keys*/) {
     if (dirty()) {
         if constexpr (dr::is_jit_v<Float>) {
-            bool is_bspline_curve = (shape_type() == +ShapeType::BSplineCurve);
-            bool is_linear_curve = (shape_type() == +ShapeType::LinearCurve);
+            bool is_bspline_curve = shape_type() == +ShapeType::BSplineCurve,
+                 is_linear_curve  = shape_type() == +ShapeType::LinearCurve;
+
             if (!is_mesh() && !is_bspline_curve && !is_linear_curve) // to_world/to_object is used
                 dr::make_opaque(m_to_world, m_to_object);
         }
 
         if (m_emitter)
             m_emitter->parameters_changed({"parent"});
+
         if (m_sensor)
             m_sensor->parameters_changed({"parent"});
 
@@ -661,17 +674,21 @@ MI_VARIANT bool Shape<Float, Spectrum>::parameters_grad_enabled() const {
 
 MI_VARIANT void Shape<Float, Spectrum>::initialize() {
     if constexpr (dr::is_jit_v<Float>) {
-        bool is_bspline_curve = (shape_type() == +ShapeType::BSplineCurve);
-        bool is_linear_curve = (shape_type() == +ShapeType::LinearCurve);
+        bool is_bspline_curve = shape_type() == +ShapeType::BSplineCurve,
+             is_linear_curve  = shape_type() == +ShapeType::LinearCurve;
+
         if (!is_mesh() && !is_bspline_curve && !is_linear_curve) // to_world/to_object is not used
             dr::make_opaque(m_to_world, m_to_object);
     }
 
     // Explicitly register this shape as the parent of the provided sub-objects
-    if (m_emitter)
-        m_emitter->set_shape(this);
-    if (m_sensor)
-        m_sensor->set_shape(this);
+    if (!m_initialized) {
+        if (m_emitter)
+            m_emitter->set_shape(this);
+
+        if (m_sensor)
+            m_sensor->set_shape(this);
+    }
 
     m_initialized = true;
 }
@@ -698,6 +715,6 @@ MI_VARIANT std::string Shape<Float, Spectrum>::get_children_string() const {
     return oss.str();
 }
 
-MI_IMPLEMENT_CLASS_VARIANT(Shape, Object, "shape")
+MI_IMPLEMENT_TRAVERSE_CB(Shape, Object);
 MI_INSTANTIATE_CLASS(Shape)
 NAMESPACE_END(mitsuba)

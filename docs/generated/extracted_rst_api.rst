@@ -127,7 +127,7 @@
         Parameter ``eta`` (str):
             Estimated time until 100% is reached.
 
-        Parameter ``ptr`` (types.CapsuleType | None):
+        Parameter ``ptr`` (typing_extensions.CapsuleType | None):
             Custom pointer payload. This is used to express the context of a
             progress message. When rendering a scene, it will usually contain
             a pointer to the associated ``RenderJob``.
@@ -5648,7 +5648,7 @@
         Parameter ``eta`` (str):
             Estimated time until 100% is reached.
 
-        Parameter ``ptr`` (types.CapsuleType | None):
+        Parameter ``ptr`` (typing_extensions.CapsuleType | None):
             Custom pointer payload. This is used to express the context of a
             progress message. When rendering a scene, it will usually contain
             a pointer to the associated ``RenderJob``.
@@ -7161,7 +7161,7 @@
 
         Return a pointer to the file contents in memory
 
-        Returns → types.CapsuleType:
+        Returns → typing_extensions.CapsuleType:
             *no description available*
 
     .. py:method:: mitsuba.MemoryMappedFile.filename()
@@ -7394,7 +7394,7 @@
         Parameter ``other`` (:py:obj:`mitsuba.Mesh`):
             *no description available*
 
-        Returns → ref<mitsuba::Mesh<drjit::DiffArray<(JitBackend)2, float>, mitsuba::Color<drjit::DiffArray<(JitBackend)2, float>, 3ul>>>:
+        Returns → ref<mitsuba::Mesh<drjit::DiffArray<(JitBackend)2, float>, mitsuba::Color<drjit::DiffArray<(JitBackend)2, float>, 3ul> > >:
             *no description available*
 
     .. py:method:: mitsuba.Mesh.opposite_dedge(self, index, active=True)
@@ -8184,6 +8184,39 @@
     The :py:class:`PCG32` class is implemented as a :ref:`PyTree <pytrees>`, which
     means that it is compatible with symbolic function calls, loops, etc.
 
+    .. note::
+
+       Please watch out for the following pitfall when using the PCG32 class in
+       long-running Dr.Jit calculations (e.g., steps of a gradient-based optimizer).
+
+       Consuming random variates (e.g., through :py:func:`next_float`) changes
+       the internal RNG state. If this state is never explicitly evaluated, the
+       computation graph describing the state transformation keeps growing
+       without bound, causing kernel compilation of increasingly large programs
+       to eventually become a bottleneck. To evaluate the RNG, simply run
+
+       .. code-block:: python
+
+          rng: PCG32 = ....
+          dr.eval(rng)
+
+       For computation involving very large arrays, storing the RNG state (16
+       bytes per entry) can be prohibitive. In this case, it is better to keep
+       the RNG in symbolic form and re-seed it at every optimization iteration.
+
+       .. code-block:: python
+
+          rng = PCG32(size, dr.opaque(UIn64, iteration_index))
+
+       Finally, the functions :py:func:`drjit.rand` and :py:func:`drjit.normal`
+       provide a higher-level wrapper around the PCG32 class. These are
+       equivalent to constructing a newly seeded PCG32 instance and drawing a
+       single sample.
+
+       In cases where a sampler is repeatedly used in a symbolic loop, it is
+       more efficient to use the PCG32 API directly to seed once and reuse the
+       random number generator throughout the loop.
+
     .. py:method:: __init__(self, size=1, initstate=UInt64(0x853c49e6748fea9b), initseq=UInt64(0xda3e39cb94b95bdb))
 
         Overloaded function.
@@ -8220,20 +8253,89 @@
 
         Sequence increment of the PCG32 PRNG (an unsigned 64-bit integer or integer array). Please see the original paper for details on this field.
 
+    .. py:method:: mitsuba.PCG32.next_float(self, dtype, mask=True)
+
+        Generate a uniformly distributed precision floating point number on the
+        interval :math:`[0, 1)`.
+
+        The function analyzes the provided target ``dtype`` and either invokes
+        :py:func:`next_float16`, :py:func:`next_float32` or :py:func:`next_float64`
+        depending on the
+        requested precision.
+
+        A mask can be optionally provided. Masked entries do not advance the PRNG state.
+
+        Parameter ``dtype`` (type):
+            *no description available*
+
+        Parameter ``mask`` (object):
+            *no description available*
+
+        Returns → object:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.next_float16()
+
+        Overloaded function.
+
+        1. ``next_float16(self) -> drjit.llvm.ad.Float16``
+
+        Generate a uniformly distributed half precision floating point number on the
+        interval :math:`[0, 1)`.
+
+        Two overloads of this function exist: the masked variant does not advance
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``next_float16(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float16``
+
+        Returns → drjit.llvm.ad.Float16:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.next_float16_normal()
+
+        Overloaded function.
+
+        1. ``next_float16_normal(self) -> drjit.llvm.ad.Float16``
+
+        Generate a (standard) normally distributed half precision floating point number.
+
+        Two overloads of this function exist: the masked variant does not advance
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``next_float16_normal(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float16``
+
+        Returns → drjit.llvm.ad.Float16:
+            *no description available*
+
     .. py:method:: mitsuba.PCG32.next_float32()
 
         Overloaded function.
 
         1. ``next_float32(self) -> drjit.llvm.ad.Float``
 
-
-        2. ``next_float32(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float``
-
         Generate a uniformly distributed single precision floating point number on the
         interval :math:`[0, 1)`.
 
         Two overloads of this function exist: the masked variant does not advance
         the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``next_float32(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float``
+
+        Returns → drjit.llvm.ad.Float:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.next_float32_normal()
+
+        Overloaded function.
+
+        1. ``next_float32_normal(self) -> drjit.llvm.ad.Float``
+
+        Generate a (standard) normally distributed single precision floating point number.
+
+        Two overloads of this function exist: the masked variant does not advance
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``next_float32_normal(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float``
 
         Returns → drjit.llvm.ad.Float:
             *no description available*
@@ -8244,16 +8346,50 @@
 
         1. ``next_float64(self) -> drjit.llvm.ad.Float64``
 
-
-        2. ``next_float64(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float64``
-
         Generate a uniformly distributed double precision floating point number on the
         interval :math:`[0, 1)`.
 
         Two overloads of this function exist: the masked variant does not advance
         the PRNG state of entries ``i`` where ``mask[i] == False``.
 
+        2. ``next_float64(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float64``
+
         Returns → drjit.llvm.ad.Float64:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.next_float64_normal()
+
+        Overloaded function.
+
+        1. ``next_float64_normal(self) -> drjit.llvm.ad.Float64``
+
+        Generate a (standard) normally distributed double precision floating point number.
+
+        Two overloads of this function exist: the masked variant does not advance
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``next_float64_normal(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float64``
+
+        Returns → drjit.llvm.ad.Float64:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.next_float_normal(self, dtype, mask=True)
+
+        Generate a (standard) normally distributed precision floating point number.
+
+        The function analyzes the provided target ``dtype`` and either invokes
+        :py:func:`next_float16_normal`, :py:func:`next_float32_normal` or
+        :py:func:`next_float64_normal` depending on the requested precision.
+
+        A mask can be optionally provided. Masked entries do not advance the PRNG state.
+
+        Parameter ``dtype`` (type):
+            *no description available*
+
+        Parameter ``mask`` (object):
+            *no description available*
+
+        Returns → object:
             *no description available*
 
     .. py:method:: mitsuba.PCG32.next_uint32()
@@ -8324,6 +8460,185 @@
         Returns → drjit.llvm.ad.UInt64:
             *no description available*
 
+    .. py:method:: mitsuba.PCG32.prev_float(self, dtype, mask=True)
+
+        Generate the previous uniformly distributed precision floating point number
+        on the interval :math:`[0, 1)` by stepping the PCG32 state backwards.
+
+        The function analyzes the provided target ``dtype`` and either invokes
+        :py:func:`prev_float16`, :py:func:`prev_float32` or :py:func:`prev_float64`
+        depending on the
+        requested precision.
+
+        A mask can be optionally provided. Masked entries do not regress the PRNG state.
+
+        Parameter ``dtype`` (type):
+            *no description available*
+
+        Parameter ``mask`` (object):
+            *no description available*
+
+        Returns → object:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.prev_float16()
+
+        Overloaded function.
+
+        1. ``prev_float16(self) -> drjit.llvm.ad.Float16``
+
+        Generate the previous uniformly distributed half precision floating point number
+        on the interval :math:`[0, 1)` by stepping the PCG32 state backwards.
+
+        Two overloads of this function exist: the masked variant does not regress
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``prev_float16(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float16``
+
+        Returns → drjit.llvm.ad.Float16:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.prev_float16_normal()
+
+        Overloaded function.
+
+        1. ``prev_float16_normal(self) -> drjit.llvm.ad.Float16``
+
+        Generate the previous (standard) normally distributed half precision floating
+        point number by stepping the PCG32 state backwards.
+
+        Two overloads of this function exist: the masked variant does not regress
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``prev_float16_normal(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float16``
+
+        Returns → drjit.llvm.ad.Float16:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.prev_float32()
+
+        Overloaded function.
+
+        1. ``prev_float32(self) -> drjit.llvm.ad.Float``
+
+        Generate the previous uniformly distributed single precision floating point number
+        on the interval :math:`[0, 1)` by stepping the PCG32 state backwards.
+
+        Two overloads of this function exist: the masked variant does not regress
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``prev_float32(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float``
+
+        Returns → drjit.llvm.ad.Float:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.prev_float32_normal()
+
+        Overloaded function.
+
+        1. ``prev_float32_normal(self) -> drjit.llvm.ad.Float``
+
+        Generate the previous (standard) normally distributed single precision floating
+        point number by stepping the PCG32 state backwards.
+
+        Two overloads of this function exist: the masked variant does not regress
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``prev_float32_normal(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float``
+
+        Returns → drjit.llvm.ad.Float:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.prev_float64()
+
+        Overloaded function.
+
+        1. ``prev_float64(self) -> drjit.llvm.ad.Float64``
+
+        Generate the previous uniformly distributed double precision floating point number
+        on the interval :math:`[0, 1)` by stepping the PCG32 state backwards.
+
+        Two overloads of this function exist: the masked variant does not regress
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``prev_float64(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float64``
+
+        Returns → drjit.llvm.ad.Float64:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.prev_float64_normal()
+
+        Overloaded function.
+
+        1. ``prev_float64_normal(self) -> drjit.llvm.ad.Float64``
+
+        Generate the previous (standard) normally distributed double precision floating
+        point number by stepping the PCG32 state backwards.
+
+        Two overloads of this function exist: the masked variant does not regress
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``prev_float64_normal(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.Float64``
+
+        Returns → drjit.llvm.ad.Float64:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.prev_float_normal(self, dtype, mask=True)
+
+        Generate the previous (standard) normally distributed precision floating point number
+        by stepping the PCG32 state backwards.
+
+        The function analyzes the provided target ``dtype`` and either invokes
+        :py:func:`prev_float16_normal`, :py:func:`prev_float32_normal` or
+        :py:func:`prev_float64_normal` depending on the requested precision.
+
+        A mask can be optionally provided. Masked entries do not regress the PRNG state.
+
+        Parameter ``dtype`` (type):
+            *no description available*
+
+        Parameter ``mask`` (object):
+            *no description available*
+
+        Returns → object:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.prev_uint32()
+
+        Overloaded function.
+
+        1. ``prev_uint32(self) -> drjit.llvm.ad.UInt``
+
+        Generate the previous uniformly distributed unsigned 32-bit random number
+        by stepping the PCG32 state backwards.
+
+        Two overloads of this function exist: the masked variant does not
+        regress the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``prev_uint32(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.UInt``
+
+        Returns → drjit.llvm.ad.UInt:
+            *no description available*
+
+    .. py:method:: mitsuba.PCG32.prev_uint64()
+
+        Overloaded function.
+
+        1. ``prev_uint64(self) -> drjit.llvm.ad.UInt64``
+
+        Generate the previous uniformly distributed unsigned 64-bit random number
+        by stepping the PCG32 state backwards.
+
+        Internally, the function calls :py:func:`prev_uint32` twice.
+
+        Two overloads of this function exist: the masked variant does not regress
+        the PRNG state of entries ``i`` where ``mask[i] == False``.
+
+        2. ``prev_uint64(self, arg: drjit.llvm.ad.Bool, /) -> drjit.llvm.ad.UInt64``
+
+        Returns → drjit.llvm.ad.UInt64:
+            *no description available*
+
     .. py:method:: mitsuba.PCG32.seed(self, initstate=UInt64(0x853c49e6748fea9b), initseq=UInt64(0xda3e39cb94b95bdb))
 
         Seed the random number generator with the given initial state and sequence ID.
@@ -8367,6 +8682,10 @@
     .. py:data:: Discontinuous
 
         Tracking gradients w.r.t. this parameter will introduce discontinuities
+
+    .. py:data:: ReadOnly
+
+        This parameter is read-only
 
 .. py:class:: mitsuba.PhaseFunction
 
@@ -8698,6 +9017,19 @@
         Returns → :py:obj:`mitsuba.Class`:
             *no description available*
 
+    .. py:method:: mitsuba.PluginManager.get_plugin_type(self, plugin_name)
+
+        Parameter ``plugin_name`` (str):
+            *no description available*
+
+        Returns → str:
+            *no description available*
+
+    .. py:method:: mitsuba.PluginManager.loaded_plugins()
+
+        Returns → list[str]:
+            *no description available*
+
 .. py:class:: mitsuba.Point0d
 
 .. py:class:: mitsuba.Point0f
@@ -8960,6 +9292,62 @@
 
     Copy constructor
 
+    .. py:class:: mitsuba.Properties.Type
+
+        Valid values are as follows:
+
+        .. py:data:: Bool
+
+            Boolean value (true/false)
+
+        .. py:data:: Long
+
+            64-bit signed integer
+
+        .. py:data:: Float
+
+            Floating point value
+
+        .. py:data:: Array3f
+
+            3D array
+
+        .. py:data:: Transform3f
+
+            3x3 transform for homogeneous coordinates
+
+        .. py:data:: Transform4f
+
+            4x4 transform for homogeneous coordinates
+
+        .. py:data:: AnimatedTransform
+
+            An animated 4x4 transformation
+
+        .. py:data:: TensorHandle
+
+            A tensor of arbitrary shape
+
+        .. py:data:: Color
+
+            Tristimulus color value
+
+        .. py:data:: String
+
+            String
+
+        .. py:data:: NamedReference
+
+            Named reference to another named object
+
+        .. py:data:: Object
+
+            Arbitrary object
+
+        .. py:data:: Pointer
+
+            const void* pointer (for internal communication between plugins)
+
     .. py:method:: mitsuba.Properties.as_string(self, arg)
 
         Return one of the parameters (converting it to a string if necessary)
@@ -9111,7 +9499,7 @@
         Parameter ``arg`` (str, /):
             *no description available*
 
-        Returns → mitsuba::Properties::Type:
+        Returns → :py:obj:`mitsuba.Properties.Type`:
             *no description available*
 
     .. py:method:: mitsuba.Properties.unqueried()
@@ -9243,7 +9631,7 @@
         
         Copy constructor
         
-        3. ``__init__(self, o: :py:obj:`mitsuba.Point2f`, d: :py:obj:`mitsuba.Vector2f`, time: drjit.llvm.ad.Float = 0.0, wavelengths: :py:obj:`mitsuba.Color0f` = []) -> None``
+        3. ``__init__(self, o: :py:obj:`mitsuba.Point2f`, d: :py:obj:`mitsuba.Vector2f`, time: drjit.llvm.ad.Float = 0.0, wavelengths: :py:obj:`mitsuba.Color0f` | None = None) -> None``
         
         Construct a new ray (o, d) with time
         
@@ -9314,7 +9702,7 @@
         
         Copy constructor
         
-        3. ``__init__(self, o: :py:obj:`mitsuba.Point3d`, d: :py:obj:`mitsuba.Vector3d`, time: drjit.llvm.ad.Float64 = 0.0, wavelengths: :py:obj:`mitsuba.Color0f` = []) -> None``
+        3. ``__init__(self, o: :py:obj:`mitsuba.Point3d`, d: :py:obj:`mitsuba.Vector3d`, time: drjit.llvm.ad.Float64 = 0.0, wavelengths: :py:obj:`mitsuba.Color0f` | None = None) -> None``
         
         Construct a new ray (o, d) with time
         
@@ -9385,7 +9773,7 @@
         
         Copy constructor
         
-        3. ``__init__(self, o: :py:obj:`mitsuba.Point3f`, d: :py:obj:`mitsuba.Vector3f`, time: drjit.llvm.ad.Float = 0.0, wavelengths: :py:obj:`mitsuba.Color0f` = []) -> None``
+        3. ``__init__(self, o: :py:obj:`mitsuba.Point3f`, d: :py:obj:`mitsuba.Vector3f`, time: drjit.llvm.ad.Float = 0.0, wavelengths: :py:obj:`mitsuba.Color0f` | None = None) -> None``
         
         Construct a new ray (o, d) with time
         
@@ -11624,10 +12012,11 @@
 
         This method is a convenience wrapper of the generalized version of
         ``ray_intersect``() below. It assumes that incoherent rays are being
-        traced, and that the user desires access to all fields of the
-        SurfaceInteraction. In other words, it simply invokes the general
-        ``ray_intersect``() overload with ``coherent=false`` and ``ray_flags``
-        equal to RayFlags::All.
+        traced, that the user desires access to all fields of the
+        SurfaceInteraction, and that no thread reodering is requested. In
+        other words, it simply invokes the general ``ray_intersect``()
+        overload with ``coherent=false``, ``ray_flags`` equal to
+        RayFlags::All, and ``reorder=false``.
 
         Parameter ``ray`` (:py:obj:`mitsuba.Ray3f`):
             A 3D ray including maximum extent (Ray::maxt) and time (Ray::time)
@@ -11641,6 +12030,75 @@
             should be queried to check if an intersection was actually found.
 
         2. ``ray_intersect(self, ray: :py:obj:`mitsuba.Ray3f`, ray_flags: int, coherent: drjit.llvm.ad.Bool, active: drjit.llvm.ad.Bool = True) -> :py:obj:`mitsuba.SurfaceInteraction3f```
+
+        Intersect a ray with the shapes comprising the scene and return a
+        detailed data structure describing the intersection, if one is found
+
+        In vectorized variants of Mitsuba (``cuda_*`` or ``llvm_*``), the
+        function processes arrays of rays and returns arrays of surface
+        interactions following the usual conventions.
+
+        This ray intersection method exposes two additional flags to control
+        the intersection process. Internally, it is split into two steps:
+
+        <ol>
+
+        * Finding a PreliminaryInteraction using the ray tracing backend
+        underlying the current variant (i.e., Mitsuba's builtin kd-tree,
+        Embree, or OptiX). This is done using the ray_intersect_preliminary()
+        function that is also available directly below (and preferable if a
+        full SurfaceInteraction is not needed.).
+
+        * Expanding the PreliminaryInteraction into a full SurfaceInteraction
+        (this part happens within Mitsuba/Dr.Jit and tracks derivative
+        information in AD variants of the system).
+
+        </ol>
+
+        The SurfaceInteraction data structure is large, and computing its
+        contents in the second step requires a non-trivial amount of
+        computation and sequence of memory accesses. The ``ray_flags``
+        parameter can be used to specify that only a sub-set of the full
+        intersection data structure actually needs to be computed, which can
+        improve performance.
+
+        In the context of differentiable rendering, the ``ray_flags``
+        parameter also influences how derivatives propagate between the input
+        ray, the shape parameters, and the computed intersection (see
+        RayFlags::FollowShape and RayFlags::DetachShape for details on this).
+        The default, RayFlags::All, propagates derivatives through all steps
+        of the intersection computation.
+
+        The ``coherent`` flag is a hint that can improve performance in the
+        first step of finding the PreliminaryInteraction if the input set of
+        rays is coherent (e.g., when they are generated by
+        Sensor::sample_ray(), which means that adjacent rays will traverse
+        essentially the same region of space). This flag is currently only
+        used by the combination of ``llvm_*`` variants and the Embree ray
+        tracing backend.
+
+        This method is a convenience wrapper of the generalized
+        ``ray_intersect``() method below. It assumes that ``reorder=false``.
+
+        Parameter ``ray`` (:py:obj:`mitsuba.Ray3f`):
+            A 3D ray including maximum extent (Ray::maxt) and time (Ray::time)
+            information, which matters when the shapes are in motion
+
+        Parameter ``ray_flags``:
+            An integer combining flag bits from RayFlags (merged using binary
+            or).
+
+        Parameter ``coherent``:
+            Setting this flag to ``True`` can noticeably improve performance
+            when ``ray`` contains a coherent set of rays (e.g. primary camera
+            rays), and when using ``llvm_*`` variants of the renderer along
+            with Embree. It has no effect in scalar or CUDA/OptiX variants.
+
+        Returns → :py:obj:`mitsuba.SurfaceInteraction3f`:
+            A detailed surface interaction record. Its ``is_valid()`` method
+            should be queried to check if an intersection was actually found.
+
+        3. ``ray_intersect(self, ray: :py:obj:`mitsuba.Ray3f`, ray_flags: int, coherent: drjit.llvm.ad.Bool, reorder: bool = False, reorder_hint: drjit.llvm.ad.UInt = 0, reorder_hint_bits: int = 0, active: drjit.llvm.ad.Bool = True) -> :py:obj:`mitsuba.SurfaceInteraction3f```
 
         Intersect a ray with the shapes comprising the scene and return a
         detailed data structure describing the intersection, if one is found
@@ -11689,6 +12147,12 @@
         used by the combination of ``llvm_*`` variants and the Embree ray
         tracing backend.
 
+        The ``reoder`` flag is a trigger for the Shader Execution Reordering
+        (SER) feature on NVIDIA GPUs. It can improve performance in highly
+        divergent workloads by shuffling threads into coherent warps. This
+        shuffling operation uses the result of the intersection (the shape ID)
+        as a sorting key to group threads into coherent warps.
+
         Parameter ``ray`` (:py:obj:`mitsuba.Ray3f`):
             A 3D ray including maximum extent (Ray::maxt) and time (Ray::time)
             information, which matters when the shapes are in motion
@@ -11703,11 +12167,95 @@
             rays), and when using ``llvm_*`` variants of the renderer along
             with Embree. It has no effect in scalar or CUDA/OptiX variants.
 
+        Parameter ``reorder``:
+            Setting this flag to ``True`` will trigger a reordering of the
+            threads using the GPU's Shader Execution Reordering (SER)
+            functionality if the scene's ``allow_thread_reordering`` flag was
+            also set. This flag has no effect in scalar or LLVM variants.
+
+        Parameter ``reorder_hint``:
+            The reordering will always shuffle the threads based on the shape
+            the thread's ray intersected. However, additional granularity can
+            be achieved by providing an extra sorting key with this parameter.
+            This flag has no effect in scalar or LLVM variants, or if the
+            ``reorder`` parameter is ``False``.
+
+        Parameter ``reorder_hint_bits``:
+            Number of bits from the ``reorder_hint`` to use (starting from the
+            least signifcant bit). It is recommended to use as few as
+            possible. At most, 16 bits can be used. This flag has no effect in
+            scalar or LLVM variants, or if the ``reorder`` parameter is
+            ``False``.
+
         Returns → :py:obj:`mitsuba.SurfaceInteraction3f`:
             A detailed surface interaction record. Its ``is_valid()`` method
             should be queried to check if an intersection was actually found.
 
     .. py:method:: mitsuba.Scene.ray_intersect_preliminary(self, ray, coherent=False, active=True)
+
+        Overloaded function.
+
+        1. ``ray_intersect_preliminary(self, ray: :py:obj:`mitsuba.Ray3f`, coherent: drjit.llvm.ad.Bool = False, active: drjit.llvm.ad.Bool = True) -> :py:obj:`mitsuba.PreliminaryIntersection3f```
+
+        Intersect a ray with the shapes comprising the scene and return
+        preliminary information, if one is found
+
+        This function invokes the ray tracing backend underlying the current
+        variant (i.e., Mitsuba's builtin kd-tree, Embree, or OptiX) and
+        returns preliminary intersection information consisting of
+
+        * the ray distance up to the intersection (if one is found).
+
+        * the intersected shape and primitive index.
+
+        * local UV coordinates of the intersection within the primitive.
+
+        * A pointer to the intersected shape or instance.
+
+        The information is only preliminary at this point, because it lacks
+        various other information (geometric and shading frame, texture
+        coordinates, curvature, etc.) that is generally needed by shading
+        models. In variants of Mitsuba that perform automatic differentiation,
+        it is important to know that computation done by the ray tracing
+        backend is not reflected in Dr.Jit's computation graph. The
+        ray_intersect() method will re-evaluate certain parts of the
+        computation with derivative tracking to rectify this.
+
+        In vectorized variants of Mitsuba (``cuda_*`` or ``llvm_*``), the
+        function processes arrays of rays and returns arrays of preliminary
+        intersection records following the usual conventions.
+
+        This method is a convenience wrapper of the generalized version of
+        ``ray_intersect_preliminary``() below, which assumes that no
+        reordering is requested. In other words, it simply invokes the general
+        ``ray_intersect_preliminary``() overload with ``reorder=false``.
+
+        The ``coherent`` flag is a hint that can improve performance if the
+        input set of rays is coherent (e.g., when they are generated by
+        Sensor::sample_ray(), which means that adjacent rays will traverse
+        essentially the same region of space). This flag is currently only
+        used by the combination of ``llvm_*`` variants and the Embree ray
+        intersector.
+
+        Parameter ``ray`` (:py:obj:`mitsuba.Ray3f`):
+            A 3D ray including maximum extent (Ray::maxt) and time (Ray::time)
+            information, which matters when the shapes are in motion
+
+        Parameter ``coherent`` (drjit.llvm.ad.Bool):
+            Setting this flag to ``True`` can noticeably improve performance
+            when ``ray`` contains a coherent set of rays (e.g. primary camera
+            rays), and when using ``llvm_*`` variants of the renderer along
+            with Embree. It has no effect in scalar or CUDA/OptiX variants.
+
+        Parameter ``active`` (drjit.llvm.ad.Bool):
+            Mask to specify active lanes.
+
+        Returns → :py:obj:`mitsuba.PreliminaryIntersection3f`:
+            A preliminary surface interaction record. Its ``is_valid()``
+            method should be queried to check if an intersection was actually
+            found.
+
+        2. ``ray_intersect_preliminary(self, ray: :py:obj:`mitsuba.Ray3f`, coherent: drjit.llvm.ad.Bool, reorder: bool = False, reorder_hint: drjit.llvm.ad.UInt = 0, reorder_hint_bits: int = 0, active: drjit.llvm.ad.Bool = True) -> :py:obj:`mitsuba.PreliminaryIntersection3f```
 
         Intersect a ray with the shapes comprising the scene and return
         preliminary information, if one is found
@@ -11744,6 +12292,12 @@
         used by the combination of ``llvm_*`` variants and the Embree ray
         intersector.
 
+        The ``reoder`` flag is a trigger for the Shader Execution Reordering
+        (SER) feature on NVIDIA GPUs. It can improve performance in highly
+        divergent workloads by shuffling threads into coherent warps. This
+        shuffling operation uses the result of the intersection (the shape ID)
+        as a sorting key to group threads into coherent warps.
+
         Parameter ``ray`` (:py:obj:`mitsuba.Ray3f`):
             A 3D ray including maximum extent (Ray::maxt) and time (Ray::time)
             information, which matters when the shapes are in motion
@@ -11754,8 +12308,25 @@
             rays), and when using ``llvm_*`` variants of the renderer along
             with Embree. It has no effect in scalar or CUDA/OptiX variants.
 
-        Parameter ``active`` (drjit.llvm.ad.Bool):
-            Mask to specify active lanes.
+        Parameter ``reorder``:
+            Setting this flag to ``True`` will trigger a reordering of the
+            threads using the GPU's Shader Execution Reordering (SER)
+            functionality if the scene's ``allow_thread_reordering`` flag was
+            also set. This flag has no effect in scalar or LLVM variants.
+
+        Parameter ``reorder_hint``:
+            The reordering will always shuffle the threads based on the shape
+            the thread's ray intersected. However, additional granularity can
+            be achieved by providing an extra sorting key with this parameter.
+            This flag has no effect in scalar or LLVM variants, or if the
+            ``reorder`` parameter is ``False``.
+
+        Parameter ``reorder_hint_bits``:
+            Number of bits from the ``reorder_hint`` to use (starting from the
+            least signifcant bit). It is recommended to use as few as
+            possible. At most, 16 bits can be used. This flag has no effect in
+            scalar or LLVM variants, or if the ``reorder`` parameter is
+            ``False``.
 
         Returns → :py:obj:`mitsuba.PreliminaryIntersection3f`:
             A preliminary surface interaction record. Its ``is_valid()``
@@ -11973,6 +12544,14 @@
         Returns → :py:obj:`mitsuba.SensorPtr`:
             *no description available*
 
+    .. py:method:: mitsuba.Scene.shape_types()
+
+        Returns a union of ShapeType flags denoting what is present in the
+        ShapeGroup
+
+        Returns → int:
+            *no description available*
+
     .. py:method:: mitsuba.Scene.shapes()
 
         Return the list of shapes
@@ -12067,10 +12646,10 @@
             to be used to overwrite scene parameters. This operation will happen
             before propagating the update further into the scene internal state.
 
-        Parameter ``values`` (dict):
+        Parameter ``values`` (~collections.abc.Mapping | None):
             *no description available*
 
-        Returns → list[tuple[Any, set]]:
+        Returns → list[tuple[~typing.Any, set]]:
             *no description available*
 
     .. py:method:: mitsuba.SceneParameters.keep(keys)
@@ -12925,6 +13504,23 @@
         Returns → :py:obj:`mitsuba.Color3f`:
             An trichromatic intensity or reflectance value
 
+    .. py:method:: mitsuba.Shape.eval_attribute_x(self, name, si, active=True)
+
+        Evaluate a dynamically sized shape attribute at the given surface
+        interaction.
+
+        Parameter ``name`` (str):
+            Name of the attribute to evaluate
+
+        Parameter ``si`` (:py:obj:`mitsuba.SurfaceInteraction3f`):
+            Surface interaction associated with the query
+
+        Parameter ``active`` (drjit.llvm.ad.Bool):
+            Mask to specify active lanes.
+
+        Returns → drjit.llvm.ad.ArrayXf:
+            An dynamic array of attribute values
+
     .. py:method:: mitsuba.Shape.eval_parameterization(self, uv, ray_flags=14, active=True)
 
         Parameterize the mesh using UV values
@@ -12997,6 +13593,13 @@
 
         Returns → :py:obj:`mitsuba.Point3f`:
             The corresponding boundary sample space point
+
+    .. py:method:: mitsuba.Shape.is_ellipsoids()
+
+        Is this shape a ShapeType::Ellipsoids or ShapeType::EllipsoidsMesh
+
+        Returns → bool:
+            *no description available*
 
     .. py:method:: mitsuba.Shape.is_emitter()
 
@@ -13533,6 +14136,23 @@
         Returns → :py:obj:`mitsuba.Color3f`:
             An trichromatic intensity or reflectance value
 
+    .. py:method:: mitsuba.ShapePtr.eval_attribute_x(self, name, si, active=True)
+
+        Evaluate a dynamically sized shape attribute at the given surface
+        interaction.
+
+        Parameter ``name`` (str):
+            Name of the attribute to evaluate
+
+        Parameter ``si`` (:py:obj:`mitsuba.SurfaceInteraction3f`):
+            Surface interaction associated with the query
+
+        Parameter ``active`` (drjit.llvm.ad.Bool):
+            Mask to specify active lanes.
+
+        Returns → drjit.llvm.ad.ArrayXf:
+            An dynamic array of attribute values
+
     .. py:method:: mitsuba.ShapePtr.eval_parameterization(self, uv, ray_flags=14, active=True)
 
         Parameterize the mesh using UV values
@@ -13598,6 +14218,13 @@
 
         Returns → :py:obj:`mitsuba.Point3f`:
             The corresponding boundary sample space point
+
+    .. py:method:: mitsuba.ShapePtr.is_ellipsoids()
+
+        Is this shape a ShapeType::Ellipsoids or ShapeType::EllipsoidsMesh
+
+        Returns → drjit.llvm.ad.Bool:
+            *no description available*
 
     .. py:method:: mitsuba.ShapePtr.is_emitter()
 
@@ -13924,6 +14551,10 @@
 
         Meshes (`ply`, `obj`, `serialized`)
 
+    .. py:data:: Rectangle
+
+        Rectangle: a particular type of mesh
+
     .. py:data:: BSplineCurve
 
         B-Spline curves (`bsplinecurve`)
@@ -13940,10 +14571,6 @@
 
         Linear curves (`linearcurve`)
 
-    .. py:data:: Rectangle
-
-        Rectangles (`rectangle`)
-
     .. py:data:: SDFGrid
 
         SDF Grids (`sdfgrid`)
@@ -13952,9 +14579,17 @@
 
         Spheres (`sphere`)
 
-    .. py:data:: Other
+    .. py:data:: Ellipsoids
 
-        Other shapes
+        Ellipsoids (`ellipsoids`)
+
+    .. py:data:: EllipsoidsMesh
+
+        Ellipsoids (`ellipsoidsmesh`)
+
+    .. py:data:: Invalid
+
+        Invalid for default initialization
 
 .. py:class:: mitsuba.SilhouetteSample3f
 
@@ -14045,7 +14680,7 @@
 
         Direction of the silhouette curve at the boundary point
 
-    .. py:method:: mitsuba.SilhouetteSample3f.spawn_ray()
+    .. py:method:: mitsuba.SilhouetteSample3f.spawn_ray(self, wavelengths=None)
 
         Spawn a ray on the silhouette point in the direction of d
 
@@ -14054,6 +14689,9 @@
         offsetting, during a ray intersection, the ray could potentially find
         an intersection point at its origin due to numerical instabilities in
         the intersection routines.
+
+        Parameter ``wavelengths`` (:py:obj:`mitsuba.Color0f` | None):
+            *no description available*
 
         Returns → :py:obj:`mitsuba.Ray3f`:
             *no description available*
@@ -15752,6 +16390,27 @@
         Returns → drjit.llvm.ad.TensorXf:
             *no description available*
 
+    .. py:method:: mitsuba.Texture1f.update_inplace(self, migrate=False)
+
+        Update the texture after applying an indirect update to its tensor
+        representation (obtained with py:func:`tensor()`).
+
+        A tensor representation of this texture object can be retrived with
+        py:func:`tensor()`. That representation can be modified, but in order to apply
+        it succesfuly to the texture, this method must also be called. In short,
+        this method will use the tensor representation to update the texture's
+        internal state.
+
+        In CUDA mode, when both the argument ``migrate`` and :py:func:`use_accel()` are ``True``,
+        the texture exclusively stores a copy of the input data as a CUDA texture to avoid
+        redundant storage.)
+
+        Parameter ``migrate`` (bool):
+            *no description available*
+
+        Returns → None:
+            *no description available*
+
     .. py:method:: mitsuba.Texture1f.use_accel()
 
         Return whether texture uses the GPU for storage and evaluation
@@ -16032,6 +16691,27 @@
         Returns → drjit.llvm.ad.TensorXf:
             *no description available*
 
+    .. py:method:: mitsuba.Texture2f.update_inplace(self, migrate=False)
+
+        Update the texture after applying an indirect update to its tensor
+        representation (obtained with py:func:`tensor()`).
+
+        A tensor representation of this texture object can be retrived with
+        py:func:`tensor()`. That representation can be modified, but in order to apply
+        it succesfuly to the texture, this method must also be called. In short,
+        this method will use the tensor representation to update the texture's
+        internal state.
+
+        In CUDA mode, when both the argument ``migrate`` and :py:func:`use_accel()` are ``True``,
+        the texture exclusively stores a copy of the input data as a CUDA texture to avoid
+        redundant storage.)
+
+        Parameter ``migrate`` (bool):
+            *no description available*
+
+        Returns → None:
+            *no description available*
+
     .. py:method:: mitsuba.Texture2f.use_accel()
 
         Return whether texture uses the GPU for storage and evaluation
@@ -16310,6 +16990,27 @@
         Return the texture data as a tensor object
 
         Returns → drjit.llvm.ad.TensorXf:
+            *no description available*
+
+    .. py:method:: mitsuba.Texture3f.update_inplace(self, migrate=False)
+
+        Update the texture after applying an indirect update to its tensor
+        representation (obtained with py:func:`tensor()`).
+
+        A tensor representation of this texture object can be retrived with
+        py:func:`tensor()`. That representation can be modified, but in order to apply
+        it succesfuly to the texture, this method must also be called. In short,
+        this method will use the tensor representation to update the texture's
+        internal state.
+
+        In CUDA mode, when both the argument ``migrate`` and :py:func:`use_accel()` are ``True``,
+        the texture exclusively stores a copy of the input data as a CUDA texture to avoid
+        redundant storage.)
+
+        Parameter ``migrate`` (bool):
+            *no description available*
+
+        Returns → None:
             *no description available*
 
     .. py:method:: mitsuba.Texture3f.use_accel()
@@ -16882,7 +17583,7 @@
         Creates a transformation that converts from 'frame' to the standard
         basis
 
-        Parameter ``frame`` (mitsuba::Frame<drjit::DiffArray<(JitBackend)2, double>>):
+        Parameter ``frame`` (mitsuba::Frame<drjit::DiffArray<(JitBackend)2, double> >):
             *no description available*
 
         Returns → :py:obj:`mitsuba.Transform4d`:
@@ -16995,7 +17696,7 @@
         Creates a transformation that converts from the standard basis to
         'frame'
 
-        Parameter ``frame`` (mitsuba::Frame<drjit::DiffArray<(JitBackend)2, double>>):
+        Parameter ``frame`` (mitsuba::Frame<drjit::DiffArray<(JitBackend)2, double> >):
             *no description available*
 
         Returns → :py:obj:`mitsuba.Transform4d`:
@@ -17265,26 +17966,9 @@
     .. py:method:: __init__()
 
 
-    .. py:method:: mitsuba.TraversalCallback.put_object(self, name, obj, flags)
+    .. py:method:: mitsuba.TraversalCallback.put(self, name, value, flags)
 
-        Inform the traversal callback that the instance references another
-        Mitsuba object
-
-        Parameter ``name`` (str):
-            *no description available*
-
-        Parameter ``obj`` (:py:obj:`mitsuba.Object`):
-            *no description available*
-
-        Parameter ``flags`` (int):
-            *no description available*
-
-        Returns → None:
-            *no description available*
-
-    .. py:method:: mitsuba.TraversalCallback.put_parameter(self, name, value, flags)
-
-        Inform the traversal callback about an attribute of an instance
+        Inform the traversal callback about an attribute or sub-object of an instance
 
         Parameter ``name`` (str):
             *no description available*
@@ -17624,67 +18308,6 @@
         Returns → object:
             *no description available*
 
-.. py:class:: mitsuba.ad.Adam
-
-    Base class: :py:obj:`mitsuba.ad.optimizers.Optimizer`
-
-    Implements the Adam optimizer presented in the paper *Adam: A Method for
-    Stochastic Optimization* by Kingman and Ba, ICLR 2015.
-
-    When optimizing many variables (e.g. a high resolution texture) with
-    momentum enabled, it may be beneficial to restrict state and variable
-    updates to the entries that received nonzero gradients in the current
-    iteration (``mask_updates=True``).
-    In the context of differentiable Monte Carlo simulations, many of those
-    variables may not be observed at each iteration, e.g. when a surface is
-    not visible from the current camera. Gradients for unobserved variables
-    will remain at zero by default.
-    If we do not take special care, at each new iteration:
-
-    1. Momentum accumulated at previous iterations (potentially very noisy)
-       will keep being applied to the variable.
-    2. The optimizer's state will be updated to incorporate ``gradient = 0``,
-       even though it is not an actual gradient value but rather lack of one.
-
-    Enabling ``mask_updates`` avoids these two issues. This is similar to
-    `PyTorch's SparseAdam optimizer <https://pytorch.org/docs/1.9.0/generated/torch.optim.SparseAdam.html>`_.
-
-    .. py:method:: __init__(params=None)
-
-        Parameter ``lr``:
-            learning rate
-        
-        Parameter ``beta_1``:
-            controls the exponential averaging of first order gradient moments
-        
-        Parameter ``beta_2``:
-            controls the exponential averaging of second order gradient moments
-        
-        Parameter ``mask_updates``:
-            if enabled, parameters and state variables will only be updated in a
-            given iteration if it received nonzero gradients in that iteration
-        
-        Parameter ``uniform``:
-            if enabled, the optimizer will use the 'UniformAdam' variant of Adam
-            [Nicolet et al. 2021], where the update rule uses the *maximum* of
-            the second moment estimates at the current step instead of the
-            per-element second moments.
-        
-        Parameter ``params`` (:py:class:`dict`):
-            Optional dictionary-like object containing parameters to optimize.
-
-        Parameter ``params`` (dict | None):
-            *no description available*
-
-        
-    .. py:method:: mitsuba.ad.Adam.step()
-
-        Take a gradient step
-
-    .. py:method:: mitsuba.ad.Adam.reset()
-
-        Zero-initializes the internal state associated with a parameter
-
 .. py:class:: mitsuba.ad.BaseGuidingDistr
 
     .. py:method:: mitsuba.ad.BaseGuidingDistr.sample()
@@ -17796,6 +18419,9 @@
         Returns ``mitsuba.Float`:
             Vertex coordinates of the mesh.
 
+.. py:function:: mitsuba.ad.Mapping(overloaded)
+
+
 .. py:class:: mitsuba.ad.OcSpaceDistr
 
     Base class: :py:obj:`mitsuba.ad.guiding.BaseGuidingDistr`
@@ -17856,37 +18482,6 @@
 
         Return a sample in U^3 from the stored guiding distribution and its
         reciprocal density.
-
-.. py:class:: mitsuba.ad.Optimizer
-
-    Base class of all gradient-based optimizers.
-
-    .. py:method:: __init__(params)
-
-        Parameter ``lr``:
-            learning rate
-        
-        Parameter ``params`` (:py:class:`dict`):
-            Dictionary-like object containing parameters to optimize.
-
-        Parameter ``params`` (dict):
-            *no description available*
-
-        
-    .. py:method:: mitsuba.ad.Optimizer.set_learning_rate()
-
-        Set the learning rate.
-
-        Parameter ``lr`` (``float``, ``dict``):
-            The new learning rate. A ``dict`` can be provided instead to
-            specify the learning rate for specific parameters.
-
-        Returns → None:
-            *no description available*
-
-    .. py:method:: mitsuba.ad.Optimizer.reset()
-
-        Resets the internal state associated with a parameter, if any (e.g. momentum).
 
 .. py:class:: mitsuba.ad.ProjectiveDetail
 
@@ -17997,6 +18592,10 @@
         Output ``result`` (``mi.Spectrum``):
             The integrand of the indirect discontinuous derivatives.
 
+        Output ``wavelengths`` (``mi.Wavelength``):
+            Set of wavelength used by this sample. (Only relevant in spectral
+            variants)
+
         Output ``sensor_uv`` (``mi.Point2f``):
             The UV coordinates on the sensor film to splat the result to. If
             ``preprocess`` is false, this coordinate is not used.
@@ -18030,56 +18629,6 @@
 
         Dispatches the seed surface interaction object to the appropriate
         shape's projection algorithm.
-
-.. py:class:: mitsuba.ad.SGD
-
-    Base class: :py:obj:`mitsuba.ad.optimizers.Optimizer`
-
-    Implements basic stochastic gradient descent with a fixed learning rate
-    and, optionally, momentum :cite:`Sutskever2013Importance` (0.9 is a typical
-    parameter value for the ``momentum`` parameter).
-
-    The momentum-based SGD uses the update equation
-
-    .. math::
-
-        v_{i+1} = \mu \cdot v_i +  g_{i+1}
-
-    .. math::
-        p_{i+1} = p_i + \varepsilon \cdot v_{i+1},
-
-    where :math:`v` is the velocity, :math:`p` are the positions,
-    :math:`\varepsilon` is the learning rate, and :math:`\mu` is
-    the momentum parameter.
-
-    .. py:method:: __init__(params=None)
-
-        Parameter ``lr``:
-            learning rate
-        
-        Parameter ``momentum``:
-            momentum factor
-        
-        Parameter ``mask_updates``:
-            if enabled, parameters and state variables will only be updated
-            in a given iteration if it received nonzero gradients in that iteration.
-            This only has an effect if momentum is enabled.
-            See :py:class:`mitsuba.optimizers.Adam`'s documentation for more details.
-        
-        Parameter ``params`` (:py:class:`dict`):
-            Optional dictionary-like object containing parameters to optimize.
-
-        Parameter ``params`` (dict | None):
-            *no description available*
-
-        
-    .. py:method:: mitsuba.ad.SGD.step()
-
-        Take a gradient step
-
-    .. py:method:: mitsuba.ad.SGD.reset()
-
-        Zero-initializes the internal state associated with a parameter
 
 .. py:class:: mitsuba.ad.UniformDistr
 
@@ -18510,9 +19059,22 @@
         Sample the radiance difference of two rays that hit and miss the
         silhouette point `ss.p` with direction `ss.d`.
 
-        Parameters ``curr_depth`` (``mi.UInt32``):
+        Parameter ``scene`` (``mi.Scene``)
+            Reference to the scene being rendered in a differentiable manner.
+
+        Parameter ``ss`` (``mi.SilhouetteSample3f``)
+            Reference to the silhouette sample from which to built out the
+            boundary path.
+
+        Parameter ``curr_depth`` (``mi.UInt32``):
             The current depth of the boundary segment, including the boundary
             segment itself.
+
+        Parameter ``sampler`` (``mi.Sampler``):
+            A pre-seeded sample generator.
+
+        Parameter ``wavelengths`` (``mi.Wavelength``):
+            Set of sampled wavelengths to be used for the boundary path.
 
         This function returns a tuple ``(ΔL, active)`` where
 
@@ -18528,8 +19090,25 @@
         direction `-ss.d`. If multiple connections to the sensor are valid, this
         method uses reservoir sampling to pick one.
 
+        Parameter ``scene`` (``mi.Scene``)
+            Reference to the scene being rendered in a differentiable manner.
+
+        Parameter ``ss`` (``mi.SilhouetteSample3f``)
+            Reference to the silhouette sample from which to built out the
+            boundary path.
+
         Parameters ``max_depth`` (``mi.UInt32``):
             The maximum number of ray segments to reach the sensor.
+
+        Parameter ``sampler`` (``mi.Sampler``):
+            A pre-seeded sample generator.
+
+        Parameter ``wavelengths`` (``mi.Wavelength``):
+            Set of sampled wavelengths to be used for the boundary path.
+
+        Parameter ``preprocess`` (``bool``):
+            Flag to indicate whether or not the motion of the boundary point
+            should be detached for this sample.
 
         The function returns a tuple ``(importance, uv, depth, boundary_p,
         valid)`` where
@@ -18788,6 +19367,124 @@
 
     Compute the Multiple Importance Sampling (MIS) weight given the densities
     of two sampling strategies according to the power heuristic.
+
+.. py:class:: mitsuba.ad.integrators.volprim_rf_basic.BasicVolumetricPrimitiveRadianceFieldIntegrator
+
+    Base class: :py:obj:`mitsuba.ad.integrators.common.RBIntegrator`
+
+    .. _integrator-volprim_rf_basic:
+
+    Basic Volumetric Primitive Radiance Field Integrator (:monosp:`volprim_rf_basic`)
+    ------------------------------------------------------------------------------
+
+    .. pluginparameters::
+
+     * - max_depth
+         - |int|
+         - Specifies the longest path depth in the generated output image (where -1
+           corresponds to :math:`\infty`). (Default: 64)
+
+     * - srgb_primitives
+         - |bool|
+         - Specifies whether the SH coefficients of the primitives are defined in
+           sRGB color space. (Default: True)
+
+    This plugin implements a simple radiance field integrator for ellipsoids shapes.
+
+    .. tabs::
+
+        .. code-tab:: python
+
+            'type': 'volprim_rf_basic',
+            'max_depth': 8
+
+    .. py:method:: __init__(self, arg)
+
+        Parameter ``arg`` (:py:obj:`mitsuba.Properties`, /):
+            *no description available*
+
+
+    .. py:method:: mitsuba.ad.integrators.volprim_rf_basic.BasicVolumetricPrimitiveRadianceFieldIntegrator.eval_transmission()
+
+        Evaluate the transmission model on intersected volumetric primitives
+
+    .. py:method:: mitsuba.ad.integrators.volprim_rf_basic.BasicVolumetricPrimitiveRadianceFieldIntegrator.eval_sh_emission()
+
+        Evaluate the SH directionally emission on intersected volumetric primitives
+
+    .. py:method:: mitsuba.ad.integrators.volprim_rf_basic.BasicVolumetricPrimitiveRadianceFieldIntegrator.sample()
+
+        This function does the main work of differentiable rendering and
+        remains unimplemented here. It is provided by subclasses of the
+        ``RBIntegrator`` interface.
+
+        In those concrete implementations, the function performs a Monte Carlo
+        random walk, implementing a number of different behaviors depending on
+        the ``mode`` argument. For example in primal mode (``mode ==
+        drjit.ADMode.Primal``), it behaves like a normal rendering algorithm
+        and estimates the radiance incident along ``ray``.
+
+        In forward mode (``mode == drjit.ADMode.Forward``), it estimates the
+        derivative of the incident radiance for a set of scene parameters being
+        differentiated. (This requires that these parameters are attached to
+        the AD graph and have gradients specified via ``dr.set_grad()``)
+
+        In backward mode (``mode == drjit.ADMode.Backward``), it takes adjoint
+        radiance ``δL`` and accumulates it into differentiable scene parameters.
+
+        You are normally *not* expected to directly call this function. Instead,
+        use ``mi.render()`` , which performs various necessary
+        setup steps to correctly use the functionality provided here.
+
+        The parameters of this function are as follows:
+
+        Parameter ``mode`` (``drjit.ADMode``)
+            Specifies whether the rendering algorithm should run in primal or
+            forward/backward derivative propagation mode
+
+        Parameter ``scene`` (``mi.Scene``):
+            Reference to the scene being rendered in a differentiable manner.
+
+        Parameter ``sampler`` (``mi.Sampler``):
+            A pre-seeded sample generator
+
+        Parameter ``depth`` (``mi.UInt32``):
+            Path depth of `ray` (typically set to zero). This is mainly useful
+            for forward/backward differentiable rendering phases that need to
+            obtain an incident radiance estimate. In this case, they may
+            recursively invoke ``sample(mode=dr.ADMode.Primal)`` with a nonzero
+            depth.
+
+        Parameter ``δL`` (``mi.Spectrum``):
+            When back-propagating gradients (``mode == drjit.ADMode.Backward``)
+            the ``δL`` parameter should specify the adjoint radiance associated
+            with each ray. Otherwise, it must be set to ``None``.
+
+        Parameter ``state_in`` (``Any``):
+            The primal phase of ``sample()`` returns a state vector as part of
+            its return value. The forward/backward differential phases expect
+            that this state vector is provided to them via this argument. When
+            invoked in primal mode, it should be set to ``None``.
+
+        Parameter ``active`` (``mi.Bool``):
+            This mask array can optionally be used to indicate that some of
+            the rays are disabled.
+
+        The function returns a tuple ``(spec, valid, state_out)`` where
+
+        Output ``spec`` (``mi.Spectrum``):
+            Specifies the estimated radiance and differential radiance in
+            primal and forward mode, respectively.
+
+        Output ``valid`` (``mi.Bool``):
+            Indicates whether the rays intersected a surface, which can be used
+            to compute an alpha channel.
+
+        Output ``aovs`` (``List[mi.Float]``):
+            Integrators may return one or more arbitrary output variables (AOVs).
+            The implementation has to guarantee that the number of returned AOVs
+            matches the length of self.aov_names().
+
 
 .. py:class:: mitsuba.ad.largesteps.SolveCholesky
 
@@ -19130,7 +19827,7 @@
         Vector to convert
 
     Returns → :py:obj:`mitsuba.Point2f`:
-        The azimuthal and polar angles respectively.
+        The polar and azimuthal angles respectively.
 
 .. py:function:: mitsuba.eval_reflectance(type, alpha_u, alpha_v, wi, eta)
 
@@ -19749,10 +20446,10 @@
 
     Applies the sRGB gamma curve to the given argument.
 
-    Parameter ``arg`` (drjit.llvm.ad.Float, /):
+    Parameter ``arg`` (float, /):
         *no description available*
 
-    Returns → drjit.llvm.ad.Float:
+    Returns → float:
         *no description available*
 
 .. py:function:: mitsuba.math.morton_decode2(m)
@@ -19817,10 +20514,10 @@
 
     Applies the inverse sRGB gamma curve to the given argument.
 
-    Parameter ``arg`` (drjit.llvm.ad.Float, /):
+    Parameter ``arg`` (float, /):
         *no description available*
 
-    Returns → drjit.llvm.ad.Float:
+    Returns → float:
         *no description available*
 
 .. py:function:: mitsuba.math.ulpdiff(arg0, arg1)
@@ -20641,7 +21338,7 @@
     Parameter ``scene`` (``mi.Scene``):
         Reference to the scene being rendered in a differentiable manner.
 
-    Parameter ``params`` (Any):
+    Parameter ``params`` (~typing.Any | None):
        An optional container of scene parameters that should receive gradients.
        This argument isn't optional when computing forward mode derivatives. It
        should be an instance of type ``mi.SceneParameters`` obtained via
@@ -20687,16 +21384,16 @@
         differential simulation phase. If not specified, the implementation will
         copy the value from ``spp``.
 
-    Parameter ``scene`` (mi.Scene):
+    Parameter ``scene`` (~:py:obj:`mitsuba.Scene`):
         *no description available*
 
-    Parameter ``sensor`` (Union[int, mi.Sensor]):
+    Parameter ``sensor`` (int | ~:py:obj:`mitsuba.Sensor`):
         *no description available*
 
-    Parameter ``integrator`` (mi.Integrator):
+    Parameter ``integrator`` (~:py:obj:`mitsuba.Integrator` | None):
         *no description available*
 
-    Parameter ``seed`` (mi.UInt32):
+    Parameter ``seed`` (~drjit.llvm.ad.UInt):
         *no description available*
 
     Parameter ``seed_grad`` (int):
@@ -20708,7 +21405,7 @@
     Parameter ``spp_grad`` (int):
         *no description available*
 
-    Returns → mi.TensorXf:
+    Returns → ~drjit.llvm.ad.TensorXf:
         *no description available*
 
 .. py:function:: mitsuba.sample_rgb_spectrum(sample)
@@ -21545,6 +22242,57 @@
     Returns → :py:obj:`mitsuba.Color3f`:
         *no description available*
 
+.. py:class:: mitsuba.testing.RenderingRegressionTest
+
+    A rendering regression test is a test case that compares a rendered image
+    against a reference image. The test is based on the Z-test, using the `moment`
+    integrator to compute the first and second moments of the image. The test
+    is successful if the null hypothesis (that the images are identical) cannot
+    be rejected at the given significance level.
+
+    Reference images can be generated by running pytest with the argument `--generate_ref`
+
+    .. py:method:: __init__(name, scene, sensor=0, test_spp=512, ref_spp=8192, significance_level=0.01, pixel_success_rate=0.975, references_folder=None, generate_ref=False)
+
+        Create a rendering regression test.
+        
+        Arguments:
+            name: Name of the test case
+            scene: Scene dictionary
+            sensor: Sensor to use for rendering
+            test_spp: Number of samples per pixel to use for the test
+            ref_spp:  Number of samples per pixel to use for the reference image
+            significance_level: Significance level of the test
+            pixel_success_rate: Minimum pixel success rate
+            references_folder: Path to where to store the generated reference images. If not specified, put in 'references' folder next to the test script.
+            options: Options dictionary
+
+        Parameter ``name`` (str):
+            *no description available*
+
+        Parameter ``scene`` (mi.Scene):
+            *no description available*
+
+        Parameter ``sensor`` (Union[int, mi.Sensor]):
+            *no description available*
+
+        Parameter ``generate_ref`` (bool):
+            *no description available*
+
+        
+    .. py:method:: mitsuba.testing.RenderingRegressionTest.render_reference()
+
+        Render a reference image for the test case
+
+    .. py:method:: mitsuba.testing.RenderingRegressionTest.run()
+
+        Run the test case
+
+        Returns → bool:
+            *no description available*
+
+.. py:function:: mitsuba.testing.annotations
+
 .. py:function:: mitsuba.traverse(node)
 
     Traverse a node of Mitsuba's scene graph and return a dictionary-like
@@ -21565,6 +22313,51 @@
 
     Returns → :py:obj:`mitsuba.Color3f`:
         *no description available*
+
+.. py:function:: mitsuba.util.Any()
+
+    Special type indicating an unconstrained type.
+
+    - Any is compatible with every type.
+    - Any assumed to have all methods.
+    - All values assumed to be instances of Any.
+
+    Note that all the above statements are true from the point of view of
+    static type checkers. At runtime, Any should not be used with instance
+    or class checks.
+
+.. py:function:: mitsuba.util.Optional()
+
+    Optional type.
+
+    Optional[X] is equivalent to Union[X, None].
+
+.. py:function:: mitsuba.util.Union()
+
+    Union type; Union[X, Y] means either X or Y.
+
+    To define a union, use e.g. Union[int, str].  Details:
+    - The arguments must be types and there must be at least one.
+    - None as an argument is a special case and is replaced by
+      type(None).
+    - Unions of unions are flattened, e.g.::
+
+        Union[Union[int, str], float] == Union[int, str, float]
+
+    - Unions of a single argument vanish, e.g.::
+
+        Union[int] == int  # The constructor actually returns int
+
+    - Redundant arguments are skipped, e.g.::
+
+        Union[int, str, int] == Union[int, str]
+
+    - When comparing unions, the argument order is ignored, e.g.::
+
+        Union[int, str] == Union[str, int]
+
+    - You cannot subclass or instantiate a union.
+    - You can use Optional[X] as a shorthand for Union[X, None].
 
 .. py:function:: mitsuba.util.convert_to_bitmap()
 
@@ -22561,7 +23354,7 @@
           :py:attr:`drjit.JitFlag.SymbolicLoops` and then either performs a
           symbolic or an evaluated loop.
 
-        compress (Optional[bool]): Set this this parameter to ``True`` or ``False``
+        compress (Optional[bool]): Set this parameter to ``True`` or ``False``
           to enable or disable *loop state compression* in evaluated loops (see the
           text above for a description of this feature). The function
           queries the value of :py:attr:`drjit.JitFlag.CompressLoops` when the

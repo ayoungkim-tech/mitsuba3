@@ -407,6 +407,8 @@ static const char *__doc_OptixPayloadType_payloadSemantics = R"doc()doc";
 
 static const char *__doc_OptixPipelineCompileOptions = R"doc()doc";
 
+static const char *__doc_OptixPipelineCompileOptions_allowClusteredGeometry = R"doc()doc";
+
 static const char *__doc_OptixPipelineCompileOptions_allowOpacityMicromaps = R"doc()doc";
 
 static const char *__doc_OptixPipelineCompileOptions_exceptionFlags = R"doc()doc";
@@ -507,6 +509,8 @@ static const char *__doc_OptixShaderBindingTable_raygenRecord = R"doc()doc";
 
 static const char *__doc_SbtRecord = R"doc()doc";
 
+static const char *__doc_SbtRecord_SbtRecord = R"doc()doc";
+
 static const char *__doc_SbtRecord_data = R"doc()doc";
 
 static const char *__doc_SbtRecord_header = R"doc()doc";
@@ -536,6 +540,8 @@ static const char *__doc_mitsuba_AdjointIntegrator_4 = R"doc()doc";
 static const char *__doc_mitsuba_AdjointIntegrator_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_AdjointIntegrator_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_AdjointIntegrator_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_AdjointIntegrator_AdjointIntegrator = R"doc(Create an integrator)doc";
 
@@ -693,39 +699,6 @@ static const char *__doc_mitsuba_ArgParser_parse = R"doc(Parse the given set of 
 
 static const char *__doc_mitsuba_ArgParser_parse_2 = R"doc(Parse the given set of command line arguments)doc";
 
-static const char *__doc_mitsuba_AtomicFloat =
-R"doc(Atomic floating point data type
-
-The class implements an an atomic floating point data type (which is
-not possible with the existing overloads provided by ``std::atomic``).
-It internally casts floating point values to an integer storage format
-and uses atomic integer compare and exchange operations to perform
-changes.)doc";
-
-static const char *__doc_mitsuba_AtomicFloat_AtomicFloat = R"doc(Initialize the AtomicFloat with a given floating point value)doc";
-
-static const char *__doc_mitsuba_AtomicFloat_do_atomic =
-R"doc(Apply a FP operation atomically (verified that this will be nicely
-inlined in the above operators))doc";
-
-static const char *__doc_mitsuba_AtomicFloat_m_bits = R"doc()doc";
-
-static const char *__doc_mitsuba_AtomicFloat_max = R"doc(Atomically compute the maximum)doc";
-
-static const char *__doc_mitsuba_AtomicFloat_min = R"doc(Atomically compute the minimum)doc";
-
-static const char *__doc_mitsuba_AtomicFloat_operator_T0 = R"doc(Convert the AtomicFloat into a normal floating point value)doc";
-
-static const char *__doc_mitsuba_AtomicFloat_operator_assign = R"doc(Overwrite the AtomicFloat with a floating point value)doc";
-
-static const char *__doc_mitsuba_AtomicFloat_operator_iadd = R"doc(Atomically add a floating point value)doc";
-
-static const char *__doc_mitsuba_AtomicFloat_operator_idiv = R"doc(Atomically divide by a floating point value)doc";
-
-static const char *__doc_mitsuba_AtomicFloat_operator_imul = R"doc(Atomically multiply by a floating point value)doc";
-
-static const char *__doc_mitsuba_AtomicFloat_operator_isub = R"doc(Atomically subtract a floating point value)doc";
-
 static const char *__doc_mitsuba_BSDF =
 R"doc(Bidirectional Scattering Distribution Function (BSDF) interface
 
@@ -763,6 +736,8 @@ static const char *__doc_mitsuba_BSDF_4 = R"doc()doc";
 static const char *__doc_mitsuba_BSDF_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_BSDF_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_BSDF_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_BSDFContext =
 R"doc(Context data structure for BSDF evaluation and sampling
@@ -1162,6 +1137,17 @@ cosine foreshortening factor when a non-delta component is sampled). A
 zero spectrum indicates that sampling failed.)doc";
 
 static const char *__doc_mitsuba_BSDF_set_id = R"doc(Set a string identifier)doc";
+
+static const char *__doc_mitsuba_BSDF_sh_frame =
+R"doc(Returns the shading frame accounting for any pertubations that may
+performed by the BSDF during evaluation.
+
+Parameter ``si``:
+    Surface interaction associated with the query
+
+Returns:
+    The perturbed shading frame. By default simply returns the surface
+    interaction shading frame.)doc";
 
 static const char *__doc_mitsuba_BSDF_to_string = R"doc(Return a human-readable representation of the BSDF)doc";
 
@@ -1936,7 +1922,7 @@ static const char *__doc_mitsuba_Class_m_parent_name = R"doc()doc";
 
 static const char *__doc_mitsuba_Class_m_unserialize = R"doc()doc";
 
-static const char *__doc_mitsuba_Class_m_variant = R"doc()doc";
+static const char *__doc_mitsuba_Class_m_variant_name = R"doc()doc";
 
 static const char *__doc_mitsuba_Class_name = R"doc(Return the name of the class)doc";
 
@@ -2563,6 +2549,8 @@ static const char *__doc_mitsuba_Emitter_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Emitter_6 = R"doc()doc";
 
+static const char *__doc_mitsuba_Emitter_7 = R"doc()doc";
+
 static const char *__doc_mitsuba_EmitterFlags =
 R"doc(This list of flags is used to classify the different types of
 emitters.)doc";
@@ -2659,6 +2647,8 @@ static const char *__doc_mitsuba_Endpoint_4 = R"doc()doc";
 static const char *__doc_mitsuba_Endpoint_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Endpoint_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_Endpoint_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_Endpoint_Endpoint = R"doc()doc";
 
@@ -3061,6 +3051,8 @@ static const char *__doc_mitsuba_Film_4 = R"doc()doc";
 static const char *__doc_mitsuba_Film_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Film_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_Film_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_FilmFlags = R"doc(This list of flags is used to classify the different types of films.)doc";
 
@@ -3509,6 +3501,8 @@ static const char *__doc_mitsuba_ImageBlock_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_ImageBlock_6 = R"doc()doc";
 
+static const char *__doc_mitsuba_ImageBlock_7 = R"doc()doc";
+
 static const char *__doc_mitsuba_ImageBlock_ImageBlock =
 R"doc(Construct a zero-initialized image block with the desired shape and
 channel count
@@ -3764,6 +3758,8 @@ static const char *__doc_mitsuba_Integrator_4 = R"doc()doc";
 static const char *__doc_mitsuba_Integrator_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Integrator_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_Integrator_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_Integrator_Integrator = R"doc(Create an integrator)doc";
 
@@ -4405,6 +4401,8 @@ static const char *__doc_mitsuba_Medium_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Medium_6 = R"doc()doc";
 
+static const char *__doc_mitsuba_Medium_7 = R"doc()doc";
+
 static const char *__doc_mitsuba_MediumInteraction = R"doc(Stores information related to a medium scattering interaction)doc";
 
 static const char *__doc_mitsuba_MediumInteraction_MediumInteraction = R"doc(//! @})doc";
@@ -4681,6 +4679,8 @@ static const char *__doc_mitsuba_Mesh_4 = R"doc()doc";
 static const char *__doc_mitsuba_Mesh_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Mesh_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_Mesh_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_Mesh_Mesh =
 R"doc(Creates a zero-initialized mesh with the given vertex and face counts
@@ -4985,6 +4985,26 @@ R"doc(Write the mesh encoded in binary PLY format to a stream
 Parameter ``stream``:
     Target stream that will receive the encoded output)doc";
 
+static const char *__doc_mitsuba_MiOptixAccelData = R"doc(Stores multiple OptiXTraversables: one for the each type)doc";
+
+static const char *__doc_mitsuba_MiOptixAccelData_HandleData = R"doc()doc";
+
+static const char *__doc_mitsuba_MiOptixAccelData_HandleData_buffer = R"doc()doc";
+
+static const char *__doc_mitsuba_MiOptixAccelData_HandleData_count = R"doc()doc";
+
+static const char *__doc_mitsuba_MiOptixAccelData_HandleData_handle = R"doc()doc";
+
+static const char *__doc_mitsuba_MiOptixAccelData_bspline_curves = R"doc()doc";
+
+static const char *__doc_mitsuba_MiOptixAccelData_custom_shapes = R"doc()doc";
+
+static const char *__doc_mitsuba_MiOptixAccelData_ellipsoids_meshes = R"doc()doc";
+
+static const char *__doc_mitsuba_MiOptixAccelData_linear_curves = R"doc()doc";
+
+static const char *__doc_mitsuba_MiOptixAccelData_meshes = R"doc()doc";
+
 static const char *__doc_mitsuba_MicrofacetDistribution =
 R"doc(Implementation of the Beckman and GGX / Trowbridge-Reitz microfacet
 distributions and various useful sampling routines
@@ -5170,6 +5190,8 @@ static const char *__doc_mitsuba_MonteCarloIntegrator_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_MonteCarloIntegrator_6 = R"doc()doc";
 
+static const char *__doc_mitsuba_MonteCarloIntegrator_7 = R"doc()doc";
+
 static const char *__doc_mitsuba_MonteCarloIntegrator_MonteCarloIntegrator = R"doc(Create an integrator)doc";
 
 static const char *__doc_mitsuba_MonteCarloIntegrator_class = R"doc()doc";
@@ -5248,7 +5270,12 @@ combined sun & sky emitter instantiated via XML, which recursively
 expands into a separate sun & sky instance. This functionality is
 supported by any Mitsuba object, hence it is located this level.)doc";
 
+static const char *__doc_mitsuba_Object_variant_name = R"doc(Return the instance variant (or NULL, if this is not a variant object))doc";
+
+
 static const char *__doc_mitsuba_Object_id = R"doc(Return an identifier of the current instance (if available))doc";
+
+static const char *__doc_mitsuba_Object_class_name = R"doc(Return the C++ class name of this object (e.g. "Scene", "Integrator"))doc";
 
 static const char *__doc_mitsuba_Object_parameters_changed =
 R"doc(Update internal state after applying changes to parameters
@@ -5295,24 +5322,6 @@ Remark:
 See also:
     TraversalCallback)doc";
 
-static const char *__doc_mitsuba_OptixAccelData = R"doc(Stores multiple OptiXTraversables: one for the each type)doc";
-
-static const char *__doc_mitsuba_OptixAccelData_HandleData = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixAccelData_HandleData_buffer = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixAccelData_HandleData_count = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixAccelData_HandleData_handle = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixAccelData_bspline_curves = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixAccelData_custom_shapes = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixAccelData_linear_curves = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixAccelData_meshes = R"doc()doc";
-
 static const char *__doc_mitsuba_OptixDenoiser =
 R"doc(Wrapper for the OptiX AI denoiser
 
@@ -5333,6 +5342,8 @@ static const char *__doc_mitsuba_OptixDenoiser_4 = R"doc()doc";
 static const char *__doc_mitsuba_OptixDenoiser_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_OptixDenoiser_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_OptixDenoiser_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_OptixDenoiser_OptixDenoiser =
 R"doc(Constructs an OptiX denoiser
@@ -5482,33 +5493,19 @@ static const char *__doc_mitsuba_OptixDenoiser_to_string = R"doc()doc";
 
 static const char *__doc_mitsuba_OptixDenoiser_validate_input = R"doc(Helper function to validate tensor sizes)doc";
 
-static const char *__doc_mitsuba_OptixShape = R"doc()doc";
+static const char *__doc_mitsuba_OptixProgramGroupMapping = R"doc()doc";
 
-static const char *__doc_mitsuba_OptixShapeType = R"doc(Mitsuba shapes types supported by OptiX (meshes not included))doc";
+static const char *__doc_mitsuba_OptixProgramGroupMapping_OptixProgramGroupMapping = R"doc()doc";
 
-static const char *__doc_mitsuba_OptixShapeType_BSplineCurve = R"doc()doc";
+static const char *__doc_mitsuba_OptixProgramGroupMapping_at = R"doc()doc";
 
-static const char *__doc_mitsuba_OptixShapeType_Cylinder = R"doc()doc";
+static const char *__doc_mitsuba_OptixProgramGroupMapping_index = R"doc()doc";
 
-static const char *__doc_mitsuba_OptixShapeType_Disk = R"doc()doc";
+static const char *__doc_mitsuba_OptixProgramGroupMapping_mapping = R"doc()doc";
 
-static const char *__doc_mitsuba_OptixShapeType_LinearCurve = R"doc()doc";
+static const char *__doc_mitsuba_OptixProgramGroupMapping_operator_array = R"doc()doc";
 
-static const char *__doc_mitsuba_OptixShapeType_NumOptixShapeTypes = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixShapeType_Rectangle = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixShapeType_SDFGrid = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixShapeType_Sphere = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixShape_ch_name = R"doc(Whether or not this is a built-in OptiX shape type)doc";
-
-static const char *__doc_mitsuba_OptixShape_is_builtin = R"doc(Lowercase version of OPTIX_SHAPE_TYPE_NAMES)doc";
-
-static const char *__doc_mitsuba_OptixShape_is_name = R"doc()doc";
-
-static const char *__doc_mitsuba_OptixShape_name = R"doc()doc";
+static const char *__doc_mitsuba_OptixProgramGroupMapping_operator_array_2 = R"doc()doc";
 
 static const char *__doc_mitsuba_PCG32Sampler =
 R"doc(Interface for sampler plugins based on the PCG32 random number
@@ -5523,6 +5520,8 @@ static const char *__doc_mitsuba_PCG32Sampler_4 = R"doc()doc";
 static const char *__doc_mitsuba_PCG32Sampler_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_PCG32Sampler_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_PCG32Sampler_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_PCG32Sampler_PCG32Sampler = R"doc()doc";
 
@@ -5556,6 +5555,8 @@ discontinuities)doc";
 
 static const char *__doc_mitsuba_ParamFlags_NonDifferentiable = R"doc(Tracking gradients w.r.t. this parameter is not allowed)doc";
 
+static const char *__doc_mitsuba_ParamFlags_ReadOnly = R"doc(This parameter is read-only)doc";
+
 static const char *__doc_mitsuba_PhaseFunction = R"doc()doc";
 
 static const char *__doc_mitsuba_PhaseFunction_2 = R"doc()doc";
@@ -5567,6 +5568,8 @@ static const char *__doc_mitsuba_PhaseFunction_4 = R"doc()doc";
 static const char *__doc_mitsuba_PhaseFunction_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_PhaseFunction_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_PhaseFunction_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_PhaseFunctionContext = R"doc()doc";
 
@@ -5700,6 +5703,36 @@ static const char *__doc_mitsuba_PhaseFunction_set_id = R"doc(Set a string ident
 
 static const char *__doc_mitsuba_PhaseFunction_to_string = R"doc(Return a human-readable representation of the phase function)doc";
 
+static const char *__doc_mitsuba_ObjectType = R"doc(Enumeration of plugin object types)doc";
+
+static const char *__doc_mitsuba_ObjectType_Unknown = R"doc(Unknown plugin type)doc";
+
+static const char *__doc_mitsuba_ObjectType_Scene = R"doc(Scene object)doc";
+
+static const char *__doc_mitsuba_ObjectType_Sensor = R"doc(Sensor object)doc";
+
+static const char *__doc_mitsuba_ObjectType_Film = R"doc(Film object)doc";
+
+static const char *__doc_mitsuba_ObjectType_Emitter = R"doc(Emitter object)doc";
+
+static const char *__doc_mitsuba_ObjectType_Sampler = R"doc(Sampler object)doc";
+
+static const char *__doc_mitsuba_ObjectType_Shape = R"doc(Shape object)doc";
+
+static const char *__doc_mitsuba_ObjectType_Texture = R"doc(Texture object)doc";
+
+static const char *__doc_mitsuba_ObjectType_Volume = R"doc(Volume object)doc";
+
+static const char *__doc_mitsuba_ObjectType_Medium = R"doc(Medium object)doc";
+
+static const char *__doc_mitsuba_ObjectType_BSDF = R"doc(BSDF object)doc";
+
+static const char *__doc_mitsuba_ObjectType_Integrator = R"doc(Integrator object)doc";
+
+static const char *__doc_mitsuba_ObjectType_PhaseFunction = R"doc(Phase function object)doc";
+
+static const char *__doc_mitsuba_ObjectType_ReconstructionFilter = R"doc(Reconstruction filter object)doc";
+
 static const char *__doc_mitsuba_PluginManager =
 R"doc(The object factory is responsible for loading plugin modules and
 instantiating object instances.
@@ -5735,6 +5768,12 @@ static const char *__doc_mitsuba_PluginManager_d = R"doc()doc";
 static const char *__doc_mitsuba_PluginManager_ensure_plugin_loaded = R"doc(Ensure that a plugin is loaded and ready)doc";
 
 static const char *__doc_mitsuba_PluginManager_get_plugin_class = R"doc(Return the class corresponding to a plugin for a specific variant)doc";
+
+static const char *__doc_mitsuba_PluginManager_get_plugin_type =
+R"doc(Return the plugin's shorthand from its class name (i.e "diffuse" from
+"SmoothDiffuse"))doc";
+
+static const char *__doc_mitsuba_PluginManager_plugin_type = R"doc(Get the ObjectType of a plugin by name)doc";
 
 static const char *__doc_mitsuba_PluginManager_instance = R"doc(Return the global plugin manager)doc";
 
@@ -6017,6 +6056,8 @@ static const char *__doc_mitsuba_ProjectiveCamera_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_ProjectiveCamera_6 = R"doc()doc";
 
+static const char *__doc_mitsuba_ProjectiveCamera_7 = R"doc()doc";
+
 static const char *__doc_mitsuba_ProjectiveCamera_ProjectiveCamera = R"doc()doc";
 
 static const char *__doc_mitsuba_ProjectiveCamera_class = R"doc()doc";
@@ -6144,7 +6185,7 @@ static const char *__doc_mitsuba_Properties_named_reference_2 =
 R"doc(Retrieve a named reference value (use default value if no entry
 exists))doc";
 
-static const char *__doc_mitsuba_Properties_named_references = R"doc(Return an array containing all named references and their destinations)doc";
+static const char *__doc_mitsuba_Properties_references = R"doc(Return an array containing all named references and their destinations)doc";
 
 static const char *__doc_mitsuba_Properties_object = R"doc(Retrieve an arbitrary object)doc";
 
@@ -6487,6 +6528,8 @@ static const char *__doc_mitsuba_ReconstructionFilter_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_ReconstructionFilter_6 = R"doc()doc";
 
+static const char *__doc_mitsuba_ReconstructionFilter_7 = R"doc()doc";
+
 static const char *__doc_mitsuba_ReconstructionFilter_ReconstructionFilter = R"doc(Create a new reconstruction filter)doc";
 
 static const char *__doc_mitsuba_ReconstructionFilter_border_size = R"doc(Return the block border size required when rendering with this filter)doc";
@@ -6696,6 +6739,8 @@ static const char *__doc_mitsuba_Sampler_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Sampler_6 = R"doc()doc";
 
+static const char *__doc_mitsuba_Sampler_7 = R"doc()doc";
+
 static const char *__doc_mitsuba_Sampler_Sampler = R"doc()doc";
 
 static const char *__doc_mitsuba_Sampler_Sampler_2 = R"doc(Copy state to a new sampler object)doc";
@@ -6795,6 +6840,8 @@ static const char *__doc_mitsuba_SamplingIntegrator_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_SamplingIntegrator_6 = R"doc()doc";
 
+static const char *__doc_mitsuba_SamplingIntegrator_7 = R"doc()doc";
+
 static const char *__doc_mitsuba_SamplingIntegrator_SamplingIntegrator = R"doc(//! @})doc";
 
 static const char *__doc_mitsuba_SamplingIntegrator_class = R"doc()doc";
@@ -6887,6 +6934,8 @@ static const char *__doc_mitsuba_Scene_4 = R"doc()doc";
 static const char *__doc_mitsuba_Scene_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Scene_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_Scene_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_Scene_Scene = R"doc(Instantiate a scene from a Properties object)doc";
 
@@ -7000,6 +7049,8 @@ static const char *__doc_mitsuba_Scene_m_silhouette_shapes = R"doc()doc";
 
 static const char *__doc_mitsuba_Scene_m_silhouette_shapes_dr = R"doc()doc";
 
+static const char *__doc_mitsuba_Scene_m_thread_reordering = R"doc()doc";
+
 static const char *__doc_mitsuba_Scene_parameters_changed = R"doc(Update internal state following a parameter update)doc";
 
 static const char *__doc_mitsuba_Scene_pdf_emitter =
@@ -7035,10 +7086,11 @@ interactions following the usual conventions.
 
 This method is a convenience wrapper of the generalized version of
 ``ray_intersect``() below. It assumes that incoherent rays are being
-traced, and that the user desires access to all fields of the
-SurfaceInteraction. In other words, it simply invokes the general
-``ray_intersect``() overload with ``coherent=false`` and ``ray_flags``
-equal to RayFlags::All.
+traced, that the user desires access to all fields of the
+SurfaceInteraction, and that no thread reodering is requested. In
+other words, it simply invokes the general ``ray_intersect``()
+overload with ``coherent=false``, ``ray_flags`` equal to
+RayFlags::All, and ``reorder=false``.
 
 Parameter ``ray``:
     A 3D ray including maximum extent (Ray::maxt) and time (Ray::time)
@@ -7049,6 +7101,74 @@ Returns:
     should be queried to check if an intersection was actually found.)doc";
 
 static const char *__doc_mitsuba_Scene_ray_intersect_2 =
+R"doc(Intersect a ray with the shapes comprising the scene and return a
+detailed data structure describing the intersection, if one is found
+
+In vectorized variants of Mitsuba (``cuda_*`` or ``llvm_*``), the
+function processes arrays of rays and returns arrays of surface
+interactions following the usual conventions.
+
+This ray intersection method exposes two additional flags to control
+the intersection process. Internally, it is split into two steps:
+
+<ol>
+
+* Finding a PreliminaryInteraction using the ray tracing backend
+underlying the current variant (i.e., Mitsuba's builtin kd-tree,
+Embree, or OptiX). This is done using the ray_intersect_preliminary()
+function that is also available directly below (and preferable if a
+full SurfaceInteraction is not needed.).
+
+* Expanding the PreliminaryInteraction into a full SurfaceInteraction
+(this part happens within Mitsuba/Dr.Jit and tracks derivative
+information in AD variants of the system).
+
+</ol>
+
+The SurfaceInteraction data structure is large, and computing its
+contents in the second step requires a non-trivial amount of
+computation and sequence of memory accesses. The ``ray_flags``
+parameter can be used to specify that only a sub-set of the full
+intersection data structure actually needs to be computed, which can
+improve performance.
+
+In the context of differentiable rendering, the ``ray_flags``
+parameter also influences how derivatives propagate between the input
+ray, the shape parameters, and the computed intersection (see
+RayFlags::FollowShape and RayFlags::DetachShape for details on this).
+The default, RayFlags::All, propagates derivatives through all steps
+of the intersection computation.
+
+The ``coherent`` flag is a hint that can improve performance in the
+first step of finding the PreliminaryInteraction if the input set of
+rays is coherent (e.g., when they are generated by
+Sensor::sample_ray(), which means that adjacent rays will traverse
+essentially the same region of space). This flag is currently only
+used by the combination of ``llvm_*`` variants and the Embree ray
+tracing backend.
+
+This method is a convenience wrapper of the generalized
+``ray_intersect``() method below. It assumes that ``reorder=false``.
+
+Parameter ``ray``:
+    A 3D ray including maximum extent (Ray::maxt) and time (Ray::time)
+    information, which matters when the shapes are in motion
+
+Parameter ``ray_flags``:
+    An integer combining flag bits from RayFlags (merged using binary
+    or).
+
+Parameter ``coherent``:
+    Setting this flag to ``True`` can noticeably improve performance
+    when ``ray`` contains a coherent set of rays (e.g. primary camera
+    rays), and when using ``llvm_*`` variants of the renderer along
+    with Embree. It has no effect in scalar or CUDA/OptiX variants.
+
+Returns:
+    A detailed surface interaction record. Its ``is_valid()`` method
+    should be queried to check if an intersection was actually found.)doc";
+
+static const char *__doc_mitsuba_Scene_ray_intersect_3 =
 R"doc(Intersect a ray with the shapes comprising the scene and return a
 detailed data structure describing the intersection, if one is found
 
@@ -7096,6 +7216,12 @@ essentially the same region of space). This flag is currently only
 used by the combination of ``llvm_*`` variants and the Embree ray
 tracing backend.
 
+The ``reoder`` flag is a trigger for the Shader Execution Reordering
+(SER) feature on NVIDIA GPUs. It can improve performance in highly
+divergent workloads by shuffling threads into coherent warps. This
+shuffling operation uses the result of the intersection (the shape ID)
+as a sorting key to group threads into coherent warps.
+
 Parameter ``ray``:
     A 3D ray including maximum extent (Ray::maxt) and time (Ray::time)
     information, which matters when the shapes are in motion
@@ -7109,6 +7235,26 @@ Parameter ``coherent``:
     when ``ray`` contains a coherent set of rays (e.g. primary camera
     rays), and when using ``llvm_*`` variants of the renderer along
     with Embree. It has no effect in scalar or CUDA/OptiX variants.
+
+Parameter ``reorder``:
+    Setting this flag to ``True`` will trigger a reordering of the
+    threads using the GPU's Shader Execution Reordering (SER)
+    functionality if the scene's ``allow_thread_reordering`` flag was
+    also set. This flag has no effect in scalar or LLVM variants.
+
+Parameter ``reorder_hint``:
+    The reordering will always shuffle the threads based on the shape
+    the thread's ray intersected. However, additional granularity can
+    be achieved by providing an extra sorting key with this parameter.
+    This flag has no effect in scalar or LLVM variants, or if the
+    ``reorder`` parameter is ``False``.
+
+Parameter ``reorder_hint_bits``:
+    Number of bits from the ``reorder_hint`` to use (starting from the
+    least signifcant bit). It is recommended to use as few as
+    possible. At most, 16 bits can be used. This flag has no effect in
+    scalar or LLVM variants, or if the ``reorder`` parameter is
+    ``False``.
 
 Returns:
     A detailed surface interaction record. Its ``is_valid()`` method
@@ -7156,6 +7302,11 @@ In vectorized variants of Mitsuba (``cuda_*`` or ``llvm_*``), the
 function processes arrays of rays and returns arrays of preliminary
 intersection records following the usual conventions.
 
+This method is a convenience wrapper of the generalized version of
+``ray_intersect_preliminary``() below, which assumes that no
+reordering is requested. In other words, it simply invokes the general
+``ray_intersect_preliminary``() overload with ``reorder=false``.
+
 The ``coherent`` flag is a hint that can improve performance if the
 input set of rays is coherent (e.g., when they are generated by
 Sensor::sample_ray(), which means that adjacent rays will traverse
@@ -7172,6 +7323,83 @@ Parameter ``coherent``:
     when ``ray`` contains a coherent set of rays (e.g. primary camera
     rays), and when using ``llvm_*`` variants of the renderer along
     with Embree. It has no effect in scalar or CUDA/OptiX variants.
+
+Returns:
+    A preliminary surface interaction record. Its ``is_valid()``
+    method should be queried to check if an intersection was actually
+    found.)doc";
+
+static const char *__doc_mitsuba_Scene_ray_intersect_preliminary_2 =
+R"doc(Intersect a ray with the shapes comprising the scene and return
+preliminary information, if one is found
+
+This function invokes the ray tracing backend underlying the current
+variant (i.e., Mitsuba's builtin kd-tree, Embree, or OptiX) and
+returns preliminary intersection information consisting of
+
+* the ray distance up to the intersection (if one is found).
+
+* the intersected shape and primitive index.
+
+* local UV coordinates of the intersection within the primitive.
+
+* A pointer to the intersected shape or instance.
+
+The information is only preliminary at this point, because it lacks
+various other information (geometric and shading frame, texture
+coordinates, curvature, etc.) that is generally needed by shading
+models. In variants of Mitsuba that perform automatic differentiation,
+it is important to know that computation done by the ray tracing
+backend is not reflected in Dr.Jit's computation graph. The
+ray_intersect() method will re-evaluate certain parts of the
+computation with derivative tracking to rectify this.
+
+In vectorized variants of Mitsuba (``cuda_*`` or ``llvm_*``), the
+function processes arrays of rays and returns arrays of preliminary
+intersection records following the usual conventions.
+
+The ``coherent`` flag is a hint that can improve performance if the
+input set of rays is coherent (e.g., when they are generated by
+Sensor::sample_ray(), which means that adjacent rays will traverse
+essentially the same region of space). This flag is currently only
+used by the combination of ``llvm_*`` variants and the Embree ray
+intersector.
+
+The ``reoder`` flag is a trigger for the Shader Execution Reordering
+(SER) feature on NVIDIA GPUs. It can improve performance in highly
+divergent workloads by shuffling threads into coherent warps. This
+shuffling operation uses the result of the intersection (the shape ID)
+as a sorting key to group threads into coherent warps.
+
+Parameter ``ray``:
+    A 3D ray including maximum extent (Ray::maxt) and time (Ray::time)
+    information, which matters when the shapes are in motion
+
+Parameter ``coherent``:
+    Setting this flag to ``True`` can noticeably improve performance
+    when ``ray`` contains a coherent set of rays (e.g. primary camera
+    rays), and when using ``llvm_*`` variants of the renderer along
+    with Embree. It has no effect in scalar or CUDA/OptiX variants.
+
+Parameter ``reorder``:
+    Setting this flag to ``True`` will trigger a reordering of the
+    threads using the GPU's Shader Execution Reordering (SER)
+    functionality if the scene's ``allow_thread_reordering`` flag was
+    also set. This flag has no effect in scalar or LLVM variants.
+
+Parameter ``reorder_hint``:
+    The reordering will always shuffle the threads based on the shape
+    the thread's ray intersected. However, additional granularity can
+    be achieved by providing an extra sorting key with this parameter.
+    This flag has no effect in scalar or LLVM variants, or if the
+    ``reorder`` parameter is ``False``.
+
+Parameter ``reorder_hint_bits``:
+    Number of bits from the ``reorder_hint`` to use (starting from the
+    least signifcant bit). It is recommended to use as few as
+    possible. At most, 16 bits can be used. This flag has no effect in
+    scalar or LLVM variants, or if the ``reorder`` parameter is
+    ``False``.
 
 Returns:
     A preliminary surface interaction record. Its ``is_valid()``
@@ -7364,6 +7592,10 @@ static const char *__doc_mitsuba_Scene_sensors_2 = R"doc(Return the list of sens
 
 static const char *__doc_mitsuba_Scene_sensors_dr = R"doc(Return the list of sensors as a Dr.Jit array)doc";
 
+static const char *__doc_mitsuba_Scene_shape_types =
+R"doc(Returns a union of ShapeType flags denoting what is present in the
+ShapeGroup)doc";
+
 static const char *__doc_mitsuba_Scene_shapes = R"doc(Return the list of shapes)doc";
 
 static const char *__doc_mitsuba_Scene_shapes_2 = R"doc(Return the list of shapes)doc";
@@ -7429,6 +7661,8 @@ static const char *__doc_mitsuba_Sensor_4 = R"doc()doc";
 static const char *__doc_mitsuba_Sensor_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Sensor_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_Sensor_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_Sensor_Sensor = R"doc()doc";
 
@@ -7551,6 +7785,8 @@ static const char *__doc_mitsuba_Shape_6 = R"doc()doc";
 
 static const char *__doc_mitsuba_Shape_7 = R"doc()doc";
 
+static const char *__doc_mitsuba_Shape_8 = R"doc()doc";
+
 static const char *__doc_mitsuba_ShapeGroup = R"doc()doc";
 
 static const char *__doc_mitsuba_ShapeGroup_2 = R"doc()doc";
@@ -7562,6 +7798,8 @@ static const char *__doc_mitsuba_ShapeGroup_4 = R"doc()doc";
 static const char *__doc_mitsuba_ShapeGroup_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_ShapeGroup_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_ShapeGroup_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_ShapeGroup_ShapeGroup = R"doc()doc";
 
@@ -7575,14 +7813,6 @@ static const char *__doc_mitsuba_ShapeGroup_effective_primitive_count = R"doc()d
 
 static const char *__doc_mitsuba_ShapeGroup_embree_geometry = R"doc()doc";
 
-static const char *__doc_mitsuba_ShapeGroup_has_bspline_curves = R"doc(Return whether this shapegroup contains B-spline curve shapes)doc";
-
-static const char *__doc_mitsuba_ShapeGroup_has_linear_curves = R"doc(Return whether this shapegroup contains linear curve shapes)doc";
-
-static const char *__doc_mitsuba_ShapeGroup_has_meshes = R"doc(Return whether this shapegroup contains triangle mesh shapes)doc";
-
-static const char *__doc_mitsuba_ShapeGroup_has_others = R"doc(Return whether this shapegroup contains other type of shapes)doc";
-
 static const char *__doc_mitsuba_ShapeGroup_m_accel = R"doc()doc";
 
 static const char *__doc_mitsuba_ShapeGroup_m_bbox = R"doc()doc";
@@ -7591,21 +7821,15 @@ static const char *__doc_mitsuba_ShapeGroup_m_embree_geometries = R"doc()doc";
 
 static const char *__doc_mitsuba_ShapeGroup_m_embree_scene = R"doc()doc";
 
-static const char *__doc_mitsuba_ShapeGroup_m_has_bspline_curves = R"doc()doc";
-
-static const char *__doc_mitsuba_ShapeGroup_m_has_linear_curves = R"doc()doc";
-
-static const char *__doc_mitsuba_ShapeGroup_m_has_meshes = R"doc()doc";
-
-static const char *__doc_mitsuba_ShapeGroup_m_has_others = R"doc()doc";
-
 static const char *__doc_mitsuba_ShapeGroup_m_sbt_offset = R"doc(OptiX hitgroup sbt offset)doc";
+
+static const char *__doc_mitsuba_ShapeGroup_m_shape_types = R"doc()doc";
 
 static const char *__doc_mitsuba_ShapeGroup_m_shapes = R"doc()doc";
 
 static const char *__doc_mitsuba_ShapeGroup_m_shapes_registry_ids = R"doc()doc";
 
-static const char *__doc_mitsuba_ShapeGroup_optix_build_gas = R"doc(Build OptiX geometry acceleration structures)doc";
+static const char *__doc_mitsuba_ShapeGroup_optix_build_gas = R"doc(Build OptiX geometry acceleration structures for this group's shapes)doc";
 
 static const char *__doc_mitsuba_ShapeGroup_optix_fill_hitgroup_records = R"doc()doc";
 
@@ -7618,6 +7842,10 @@ static const char *__doc_mitsuba_ShapeGroup_parameters_changed = R"doc()doc";
 static const char *__doc_mitsuba_ShapeGroup_parameters_grad_enabled = R"doc()doc";
 
 static const char *__doc_mitsuba_ShapeGroup_primitive_count = R"doc()doc";
+
+static const char *__doc_mitsuba_ShapeGroup_shape_types =
+R"doc(Returns a union of ShapeType flags denoting what is present in the
+ShapeGroup)doc";
 
 static const char *__doc_mitsuba_ShapeGroup_surface_area = R"doc()doc";
 
@@ -7636,6 +7864,8 @@ static const char *__doc_mitsuba_ShapeKDTree_4 = R"doc()doc";
 static const char *__doc_mitsuba_ShapeKDTree_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_ShapeKDTree_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_ShapeKDTree_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_ShapeKDTree_ShapeKDTree =
 R"doc(Create an empty kd-tree and take build-related parameters from
@@ -7694,15 +7924,19 @@ static const char *__doc_mitsuba_ShapeType_Cylinder = R"doc(Cylinders (`cylinder
 
 static const char *__doc_mitsuba_ShapeType_Disk = R"doc(Disks (`disk`))doc";
 
+static const char *__doc_mitsuba_ShapeType_Ellipsoids = R"doc(Ellipsoids (`ellipsoids`))doc";
+
+static const char *__doc_mitsuba_ShapeType_EllipsoidsMesh = R"doc(Ellipsoids (`ellipsoidsmesh`))doc";
+
 static const char *__doc_mitsuba_ShapeType_Instance = R"doc(Instance (`instance`))doc";
+
+static const char *__doc_mitsuba_ShapeType_Invalid = R"doc(Invalid for default initialization)doc";
 
 static const char *__doc_mitsuba_ShapeType_LinearCurve = R"doc(Linear curves (`linearcurve`))doc";
 
 static const char *__doc_mitsuba_ShapeType_Mesh = R"doc(Meshes (`ply`, `obj`, `serialized`))doc";
 
-static const char *__doc_mitsuba_ShapeType_Other = R"doc(Other shapes)doc";
-
-static const char *__doc_mitsuba_ShapeType_Rectangle = R"doc(Rectangles (`rectangle`))doc";
+static const char *__doc_mitsuba_ShapeType_Rectangle = R"doc(Rectangle: a particular type of mesh)doc";
 
 static const char *__doc_mitsuba_ShapeType_SDFGrid = R"doc(SDF Grids (`sdfgrid`))doc";
 
@@ -7820,6 +8054,9 @@ the scene by this shape
 Includes instanced geometry. The default implementation simply returns
 the same value as primitive_count().)doc";
 
+static const char *__doc_mitsuba_Shape_has_flipped_normals =
+R"doc(Does this shape have flipped normals?)doc";
+
 static const char *__doc_mitsuba_Shape_embree_geometry = R"doc(Return the Embree version of this shape)doc";
 
 static const char *__doc_mitsuba_Shape_emitter = R"doc(Return the area emitter associated with this shape (if any))doc";
@@ -7876,6 +8113,19 @@ Parameter ``si``:
 Returns:
     An trichromatic intensity or reflectance value)doc";
 
+static const char *__doc_mitsuba_Shape_eval_attribute_x =
+R"doc(Evaluate a dynamically sized shape attribute at the given surface
+interaction.
+
+Parameter ``name``:
+    Name of the attribute to evaluate
+
+Parameter ``si``:
+    Surface interaction associated with the query
+
+Returns:
+    An dynamic array of attribute values)doc";
+
 static const char *__doc_mitsuba_Shape_eval_parameterization =
 R"doc(Parameterize the mesh using UV values
 
@@ -7913,6 +8163,8 @@ Parameter ``ss``:
 
 Returns:
     The corresponding boundary sample space point)doc";
+
+static const char *__doc_mitsuba_Shape_is_ellipsoids = R"doc(Is this shape a ShapeType::Ellipsoids or ShapeType::EllipsoidsMesh)doc";
 
 static const char *__doc_mitsuba_Shape_is_emitter = R"doc(Is this shape also an area emitter?)doc";
 
@@ -7988,7 +8240,7 @@ Parameter ``hitgroup_records``:
     The array of hitgroup records where the new HitGroupRecords should
     be appended.
 
-Parameter ``program_groups``:
+Parameter ``pg``:
     The array of available program groups (used to pack the OptiX
     header at the beginning of the record).
 
@@ -7996,7 +8248,7 @@ The default implementation creates a new HitGroupSbtRecord and fills
 its data field with m_optix_data_ptr. It then calls
 optixSbtRecordPackHeader with one of the OptixProgramGroup of the
 program_groups array (the actual program group index is inferred by
-the type of the Shape, see get_shape_descr_idx()).)doc";
+the type of the Shape, see OptixProgramGroupMapping).)doc";
 
 static const char *__doc_mitsuba_Shape_optix_prepare_geometry =
 R"doc(Populates the GPU data buffer, used in the OptiX Hitgroup sbt records.
@@ -9600,6 +9852,8 @@ static const char *__doc_mitsuba_Texture_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Texture_6 = R"doc()doc";
 
+static const char *__doc_mitsuba_Texture_7 = R"doc()doc";
+
 static const char *__doc_mitsuba_Texture_D65 = R"doc(Convenience function returning the standard D65 illuminant)doc";
 
 static const char *__doc_mitsuba_Texture_D65_2 =
@@ -10101,9 +10355,9 @@ static const char *__doc_mitsuba_TraversalCallback_put_object =
 R"doc(Inform the traversal callback that the instance references another
 Mitsuba object)doc";
 
-static const char *__doc_mitsuba_TraversalCallback_put_parameter = R"doc(Inform the traversal callback about an attribute of an instance)doc";
+static const char *__doc_mitsuba_TraversalCallback_put_value = R"doc(Inform the traversal callback about an attribute of an instance)doc";
 
-static const char *__doc_mitsuba_TraversalCallback_put_parameter_impl = R"doc(Actual implementation of put_parameter(). [To be provided by subclass])doc";
+static const char *__doc_mitsuba_TraversalCallback_put_value_impl = R"doc(Actual implementation of put_value(). [To be provided by subclass])doc";
 
 static const char *__doc_mitsuba_Vector = R"doc(//! @{ \name Elementary vector, point, and normal data types)doc";
 
@@ -10129,6 +10383,8 @@ static const char *__doc_mitsuba_Volume_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_Volume_6 = R"doc()doc";
 
+static const char *__doc_mitsuba_Volume_7 = R"doc()doc";
+
 static const char *__doc_mitsuba_VolumeGrid = R"doc()doc";
 
 static const char *__doc_mitsuba_VolumeGrid_2 = R"doc()doc";
@@ -10140,6 +10396,8 @@ static const char *__doc_mitsuba_VolumeGrid_4 = R"doc()doc";
 static const char *__doc_mitsuba_VolumeGrid_5 = R"doc()doc";
 
 static const char *__doc_mitsuba_VolumeGrid_6 = R"doc()doc";
+
+static const char *__doc_mitsuba_VolumeGrid_7 = R"doc()doc";
 
 static const char *__doc_mitsuba_VolumeGrid_VolumeGrid =
 R"doc(Load a VolumeGrid from a given filename
@@ -10681,7 +10939,7 @@ Parameter ``v``:
     Vector to convert
 
 Returns:
-    The azimuthal and polar angles respectively.)doc";
+    The polar and azimuthal angles respectively.)doc";
 
 static const char *__doc_mitsuba_emitter =
 R"doc(Return the emitter associated with the intersection (if any) \note
@@ -11008,8 +11266,6 @@ Parameter ``custom_half_aperture``:
 
 Returns:
     The ratio of the sun's area to the custom aperture's area)doc";
-
-static const char *__doc_mitsuba_get_shape_descr_idx = R"doc(Retrieve index of shape descriptor)doc";
 
 static const char *__doc_mitsuba_has_flag = R"doc()doc";
 
@@ -12913,4 +13169,3 @@ static const char *__doc_operator_lshift = R"doc(Turns a vector of elements into
 #if defined(__GNUG__)
 #pragma GCC diagnostic pop
 #endif
-

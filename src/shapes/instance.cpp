@@ -53,7 +53,7 @@ details on how to create instances, refer to the :ref:`shape-shapegroup` plugin.
 template <typename Float, typename Spectrum>
 class Instance final: public Shape<Float, Spectrum> {
 public:
-    MI_IMPORT_BASE(Shape, m_id, m_to_world, m_to_object, m_shape_type,
+    MI_IMPORT_BASE(Shape, m_to_world, m_to_object, m_shape_type,
                    mark_dirty)
     MI_IMPORT_TYPES(BSDF)
 
@@ -64,10 +64,11 @@ public:
     Instance(const Properties &props) : Base(props) {
         for (auto &kv : props.objects()) {
             Base *shape = dynamic_cast<Base *>(kv.second.get());
-            if (shape && shape->is_shapegroup()) {
+            ShapeGroup_ *shapegroup = dynamic_cast<ShapeGroup_ *>(shape);
+            if (shape && shapegroup) {
                 if (m_shapegroup)
                     Throw("Only a single shapegroup can be specified per instance.");
-                m_shapegroup = (ShapeGroup_*) shape;
+                m_shapegroup = shapegroup;
             } else {
                 Throw("Only a shapegroup can be specified in an instance.");
             }
@@ -81,14 +82,26 @@ public:
         dr::make_opaque(m_to_world, m_to_object);
     }
 
-    void traverse(TraversalCallback *callback) override {
-        callback->put_parameter("to_world", *m_to_world.ptr(), +ParamFlags::NonDifferentiable);
+    void traverse(TraversalCallback *cb) override {
+        cb->put("to_world", m_to_world, ParamFlags::NonDifferentiable);
     }
 
     void parameters_changed(const std::vector<std::string> &keys) override {
         if (keys.empty() || string::contains(keys, "to_world")) {
-            // Update the scalar value of the matrix
-            m_to_world = m_to_world.value();
+            if constexpr (dr::is_diff_v<Float>) {
+                Transform4f to_world = m_to_world.value();
+                // Re-attach inverse_transpose to original matrix
+                if (dr::grad_enabled(to_world.matrix)) {
+                    Matrix4f invt_diff = dr::inverse_transpose(to_world.matrix);
+                    to_world.inverse_transpose =
+                        dr::replace_grad(to_world.inverse_transpose, invt_diff);
+                }
+                m_to_world = to_world;
+            } else {
+                // Update the scalar value of the matrix
+                m_to_world = m_to_world.value();
+            }
+
             m_to_object = m_to_world.value().inverse();
             mark_dirty();
         }
@@ -136,7 +149,7 @@ public:
     }
 
     template <typename FloatP, typename Ray3fP>
-    dr::mask_t<FloatP> ray_test_impl(const Ray3fP &ray, 
+    dr::mask_t<FloatP> ray_test_impl(const Ray3fP &ray,
                                      ScalarIndex /*prim_index*/,
                                      dr::mask_t<FloatP> active) const {
         MI_MASK_ARGUMENT(active);
@@ -240,6 +253,7 @@ public:
             si.dn_dv -= tn * dr::dot(tn, si.dn_dv);
         }
 
+        si.prim_index = pi.prim_index;
         si.instance = this;
 
         return si;
@@ -275,33 +289,29 @@ public:
 
 #if defined(MI_ENABLE_CUDA)
     virtual void optix_prepare_ias(const OptixDeviceContext& context,
-                                   std::vector<OptixInstance>& instances,
+                                   std::vector<OptixInstance>& out_instances,
                                    uint32_t instance_id,
                                    const ScalarTransform4f& transf) override {
-        m_shapegroup->optix_prepare_ias(context, instances, instance_id,
+        m_shapegroup->optix_prepare_ias(context, out_instances, instance_id,
                                         transf * m_to_world.scalar());
     }
 
     virtual void optix_fill_hitgroup_records(
         std::vector<HitGroupSbtRecord> &, const OptixProgramGroup *,
-        const std::unordered_map<size_t, size_t> &) override {
-        /* no op */
-    }
-
-    virtual void optix_prepare_geometry() override {
-        /* no op */
-    }
+        const OptixProgramGroupMapping &) override { /* no op */ }
+    virtual void optix_prepare_geometry() override { /* no op */ }
 #endif
 
     bool parameters_grad_enabled() const override {
         return dr::grad_enabled(m_to_world) || m_shapegroup->parameters_grad_enabled();
     }
 
-    MI_DECLARE_CLASS()
+    MI_DECLARE_CLASS(Instance)
 private:
    ref<ShapeGroup_> m_shapegroup;
+
+   MI_TRAVERSE_CB(Base, m_shapegroup)
 };
 
-MI_IMPLEMENT_CLASS_VARIANT(Instance, Shape)
-MI_EXPORT_PLUGIN(Instance, "Instanced geometry")
+MI_EXPORT_PLUGIN(Instance)
 NAMESPACE_END(mitsuba)

@@ -13,11 +13,12 @@ def mixed_shapes_scene():
             "filename" : "resources/data/tests/ply/rectangle_uv.ply",
         },
         "shape2": {
-            "type" : "rectangle",
+            "type" : "sphere",
         },
         "shape3": {
             "type" : "ply",
             "filename" : "resources/data/tests/ply/rectangle_uv.ply",
+            "flip_normals": True,
         },
     }, parallel=False)
 
@@ -1250,7 +1251,7 @@ def test31_primitive_silhouette_projection(variants_vec_rgb):
 
     mesh_ptr = mi.ShapePtr(mesh)
     assert dr.all((dr.reinterpret_array(mi.UInt32, ss.shape) ==
-                    dr.reinterpret_array(mi.UInt32, mesh_ptr)))
+                   dr.reinterpret_array(mi.UInt32, mesh_ptr)))
 
 
 @fresolver_append_path
@@ -1312,6 +1313,17 @@ def test34_mesh_ptr(variants_vec_rgb):
     is_nnz = dr.reinterpret_array(mi.UInt32, meshes) != 0
     assert dr.all(is_nnz == (True, False, True))
 
+    # It should be possible to construct an empty MeshPtr.
+    assert dr.width(mi.ShapePtr()) == 0
+    assert dr.width(mi.MeshPtr()) == 0
+    assert dr.width(dr.zeros(mi.MeshPtr, 0)) == 0
+    assert dr.width(dr.empty(mi.MeshPtr, 0)) == 0
+
+    # It should be possible to reshape down to zero elements.
+    a = dr.zeros(mi.MeshPtr, 4)
+    b = dr.reshape(mi.MeshPtr, a, 0, shrink=True)
+    assert dr.width(b) == 0
+
 
 @fresolver_append_path
 def test35_mesh_vcalls(variants_vec_rgb):
@@ -1337,6 +1349,7 @@ def test35_mesh_vcalls(variants_vec_rgb):
     assert dr.all(meshes.has_vertex_texcoords() == active)
     assert not dr.any(meshes.has_mesh_attributes())
     assert not dr.any(meshes.has_face_normals())
+    assert dr.all(meshes.has_flipped_normals() == [False, False, True])
 
     idx = mi.UInt32([0, 99, 1])
     face_idx = meshes.face_indices(idx, active=active)

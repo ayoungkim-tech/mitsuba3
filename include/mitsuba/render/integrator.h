@@ -34,12 +34,9 @@ NAMESPACE_BEGIN(mitsuba)
  * implementations.
  */
 template <typename Float, typename Spectrum>
-class MI_EXPORT_LIB Integrator : public Object {
+class MI_EXPORT_LIB Integrator : public JitObject<Integrator<Float, Spectrum>> {
 public:
     MI_IMPORT_TYPES(Scene, Sensor)
-
-    /// Destructor
-    ~Integrator() { }
 
     /**
      * \brief Render the scene
@@ -312,13 +309,7 @@ public:
      */
     virtual std::vector<std::string> aov_names() const;
 
-    /// Return a string identifier
-    std::string id() const override { return m_id; }
-
-    /// Set a string identifier
-    void set_id(const std::string& id) override { m_id = id; };
-
-    MI_DECLARE_CLASS()
+    MI_DECLARE_PLUGIN_BASE_CLASS(Integrator)
 
 protected:
     /// Create an integrator
@@ -343,6 +334,8 @@ protected:
 
     /// Identifier (if available)
     std::string m_id;
+
+    MI_TRAVERSE_CB(Object)
 };
 
 /** \brief Abstract integrator that performs Monte Carlo sampling starting from
@@ -425,7 +418,7 @@ public:
     //! @}
     // =========================================================================
 
-    MI_DECLARE_CLASS()
+    MI_DECLARE_CLASS(SamplingIntegrator)
 protected:
     SamplingIntegrator(const Properties &props);
 
@@ -460,6 +453,8 @@ protected:
      * If set to (uint32_t) -1, all the work is done in a single pass (default).
      */
     uint32_t m_samples_per_pass;
+
+    MI_TRAVERSE_CB(Base)
 };
 
 /** \brief Abstract integrator that performs *recursive* Monte Carlo sampling
@@ -483,10 +478,12 @@ protected:
     /// Create an integrator
     MonteCarloIntegrator(const Properties &props);
 
-    MI_DECLARE_CLASS()
+    MI_DECLARE_CLASS(MonteCarloIntegrator)
 protected:
     uint32_t m_max_depth;
     uint32_t m_rr_depth;
+
+    MI_TRAVERSE_CB(Base)
 };
 
 /** \brief Abstract adjoint integrator that performs Monte Carlo sampling
@@ -550,7 +547,7 @@ public:
     //! @}
     // =========================================================================
 
-    MI_DECLARE_CLASS()
+    MI_DECLARE_CLASS(AdjointIntegrator)
 
 protected:
     /// Create an integrator
@@ -574,6 +571,8 @@ protected:
 
     /// Depth to begin using russian roulette
     int m_rr_depth;
+
+    MI_TRAVERSE_CB(Base)
 };
 
 

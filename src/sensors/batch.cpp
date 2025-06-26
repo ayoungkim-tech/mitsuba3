@@ -98,8 +98,13 @@ public:
             if (sensor) {
                 m_sensors.push_back(sensor);
             } else if (shape) {
-                if (shape->is_sensor())
+                if (shape->is_sensor()) {
+                    /* Inner sensors only have a weak ref to any parent shape
+                     * so make sure lifetime of shapes are at least that of 
+                     * batch sensor */
+                    m_shapes.push_back(shape);
                     m_sensors.push_back(shape->sensor());
+                }
                 else
                     Throw("BatchSensor: shapes can only be specified as "
                           "children if a sensor is associated with them!");
@@ -268,24 +273,24 @@ public:
         return result;
     }
 
-    void traverse(TraversalCallback *callback) override {
-        Base::traverse(callback);
+    void traverse(TraversalCallback *cb) override {
+        Base::traverse(cb);
         std::string id;
         for(size_t i = 0; i < m_sensors.size(); i++) {
             id = m_sensors.at(i)->id();
             if (id.empty() || string::starts_with(id, "_unnamed_"))
                 id = "sensor" + std::to_string(i);
-            callback->put_object(id, m_sensors.at(i).get(), +ParamFlags::NonDifferentiable);
+            cb->put(id, m_sensors.at(i), ParamFlags::NonDifferentiable);
         }
     }
 
-    MI_DECLARE_CLASS()
+    MI_DECLARE_CLASS(BatchSensor)
 private:
+    std::vector<ref<Shape>> m_shapes;
     std::vector<ref<Base>> m_sensors;
     DynamicBuffer<SensorPtr> m_sensors_dr;
     mutable UInt32 m_last_index;
 };
 
-MI_IMPLEMENT_CLASS_VARIANT(BatchSensor, Sensor)
-MI_EXPORT_PLUGIN(BatchSensor, "BatchSensor");
+MI_EXPORT_PLUGIN(BatchSensor)
 NAMESPACE_END(mitsuba)

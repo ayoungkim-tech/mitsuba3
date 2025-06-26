@@ -171,6 +171,8 @@ public:
         Vector3f local_sun_dir = m_to_world.value().inverse().transform_affine(m_sun_dir);
 
         m_sun_angles = dir_to_sph(local_sun_dir);
+        m_sun_angles = { m_sun_angles.y(), m_sun_angles.x() }; // flip convention
+
         m_local_sun_frame = Frame3f(local_sun_dir);
 
         Float sun_eta = 0.5f * dr::Pi<Float> - m_sun_angles.y();
@@ -225,26 +227,26 @@ public:
         m_flags = +EmitterFlags::Infinite | +EmitterFlags::SpatiallyVarying;
     }
 
-    void traverse(TraversalCallback *callback) override {
-        Base::traverse(callback);
-        callback->put_parameter("turbidity", m_turbidity, +ParamFlags::NonDifferentiable);
-        callback->put_parameter("sky_scale", m_sky_scale, +ParamFlags::NonDifferentiable);
-        callback->put_parameter("sun_scale", m_sun_scale, +ParamFlags::NonDifferentiable);
-        callback->put_object("albedo", m_albedo.get(), +ParamFlags::NonDifferentiable);
+    void traverse(TraversalCallback *cb) override {
+        Base::traverse(cb);
+        cb->put("turbidity", m_turbidity, ParamFlags::NonDifferentiable);
+        cb->put("sky_scale", m_sky_scale, ParamFlags::NonDifferentiable);
+        cb->put("sun_scale", m_sun_scale, ParamFlags::NonDifferentiable);
+        cb->put("albedo",    m_albedo,    ParamFlags::NonDifferentiable);
         if (m_active_record) {
-            callback->put_parameter("latitude", m_location.latitude, +ParamFlags::NonDifferentiable);
-            callback->put_parameter("longitude", m_location.longitude, +ParamFlags::NonDifferentiable);
-            callback->put_parameter("timezone", m_location.timezone, +ParamFlags::NonDifferentiable);
-            callback->put_parameter("year", m_time.year, +ParamFlags::NonDifferentiable);
-            callback->put_parameter("day", m_time.day, +ParamFlags::NonDifferentiable);
-            callback->put_parameter("month", m_time.month, +ParamFlags::NonDifferentiable);
-            callback->put_parameter("hour", m_time.hour, +ParamFlags::NonDifferentiable);
-            callback->put_parameter("minute", m_time.minute, +ParamFlags::NonDifferentiable);
-            callback->put_parameter("second", m_time.second, +ParamFlags::NonDifferentiable);
+            cb->put("latitude",  m_location.latitude,  ParamFlags::NonDifferentiable);
+            cb->put("longitude", m_location.longitude, ParamFlags::NonDifferentiable);
+            cb->put("timezone",  m_location.timezone,  ParamFlags::NonDifferentiable);
+            cb->put("year",      m_time.year,          ParamFlags::NonDifferentiable);
+            cb->put("day",       m_time.day,           ParamFlags::NonDifferentiable);
+            cb->put("month",     m_time.month,         ParamFlags::NonDifferentiable);
+            cb->put("hour",      m_time.hour,          ParamFlags::NonDifferentiable);
+            cb->put("minute",    m_time.minute,        ParamFlags::NonDifferentiable);
+            cb->put("second",    m_time.second,        ParamFlags::NonDifferentiable);
         } else {
-            callback->put_parameter("sun_direction", m_sun_dir, +ParamFlags::Differentiable);
+            cb->put("sun_direction", m_sun_dir, ParamFlags::Differentiable);
         }
-        callback->put_parameter("to_world", *m_to_world.ptr(), +ParamFlags::NonDifferentiable);
+        cb->put("to_world", m_to_world, ParamFlags::NonDifferentiable);
     }
 
     void parameters_changed(const std::vector<std::string> &keys) override {
@@ -275,7 +277,10 @@ public:
         } else {
             local_sun_dir = m_to_world.value().inverse().transform_affine(m_sun_dir);
         }
+
         m_sun_angles = dir_to_sph(local_sun_dir);
+        m_sun_angles = { m_sun_angles.y(), m_sun_angles.x() }; // flip convention
+
         m_local_sun_frame = Frame3f(local_sun_dir);
 
         Float eta = 0.5f * dr::Pi<Float> - m_sun_angles.y();
@@ -580,7 +585,7 @@ public:
         return oss.str();
     }
 
-    MI_DECLARE_CLASS()
+    MI_DECLARE_CLASS(SunskyEmitter)
 
 private:
     /**
@@ -615,7 +620,7 @@ private:
 
         Spec c1 = 1 + coefs[0] * dr::exp(coefs[1] / (cos_theta + 0.01f));
         Spec chi = (1 + cos_gamma_sqr) /
-                   dr::pow(1 + dr::square(coefs[8]) - 2 * coefs[8] * cos_gamma, 1.5);
+                   dr::pow(1 + dr::square(coefs[8]) - 2 * coefs[8] * cos_gamma, 1.5f);
         Spec c2 = coefs[2] + coefs[3] * dr::exp(coefs[4] * gamma) +
                   coefs[5] * cos_gamma_sqr + coefs[6] * chi +
                   coefs[7] * dr::safe_sqrt(cos_theta);
@@ -815,7 +820,9 @@ private:
         Float sin_theta = Frame3f::sin_theta(local_dir);
         active &= (Frame3f::cos_theta(local_dir) >= 0.f) && (sin_theta != 0.f);
         sin_theta = dr::maximum(sin_theta, dr::Epsilon<Float>);
-        Float sky_pdf = tgmm_pdf(dir_to_sph(local_dir), active) / sin_theta;
+        Point2f angles = dir_to_sph(local_dir);
+        angles = { angles.y(), angles.x() }; // flip convention
+        Float sky_pdf = tgmm_pdf(angles, active) / sin_theta;
 
         Float cosine_cutoff = dr::cos(m_sun_half_aperture);
         Float sun_pdf = warp::square_to_uniform_cone_pdf(
@@ -997,6 +1004,7 @@ private:
 
                 return { res, ContinuousDistribution<Wavelength>(range, spectrum) };
             } else {
+                (void) range;
                 return { res, ContinuousDistribution<Wavelength>() };
             }
         }
@@ -1017,11 +1025,11 @@ private:
         m_turbidity = turb;
         dr::make_opaque(m_turbidity);
 
-        m_sun_half_aperture = dr::deg_to_rad(0.5f * props.get<ScalarFloat>("sun_aperture", 0.5358));
+        m_sun_half_aperture = dr::deg_to_rad(0.5f * (float) props.get<ScalarFloat>("sun_aperture", 0.5358));
         if (m_sun_half_aperture <= 0.f || 0.5f * dr::Pi<Float> <= m_sun_half_aperture)
             Log(Error, "Invalid sun aperture angle: %f, must be in ]0, 90[ degrees!", dr::rad_to_deg(2 * m_sun_half_aperture));
 
-        m_albedo = props.texture<Texture>("albedo", 0.3f);
+        m_albedo = props.get_texture<Texture>("albedo", 0.3f);
         if (m_albedo->is_spatially_varying())
             Log(Error, "Expected a non-spatially varying radiance spectra!");
 
@@ -1156,6 +1164,5 @@ private:
     FloatStorage m_tgmm_tables;
 };
 
-MI_IMPLEMENT_CLASS_VARIANT(SunskyEmitter, Emitter)
-MI_EXPORT_PLUGIN(SunskyEmitter, "Sun and Sky dome background emitter")
+MI_EXPORT_PLUGIN(SunskyEmitter)
 NAMESPACE_END(mitsuba)

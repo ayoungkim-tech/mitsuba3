@@ -915,6 +915,10 @@ class PSIntegrator(ADIntegrator):
         derivatives it should be manually added to the gradient obtained by
         traversing the result of this method.
         """
+        if dr.flag(dr.JitFlag.FreezingScope):
+            raise RuntimeError(
+                "Projective Integrators are not yet supported inside of frozen functions."
+            )
         if isinstance(sensor, int):
             sensor = scene.sensors()[sensor]
 
@@ -1101,7 +1105,7 @@ class PSIntegrator(ADIntegrator):
             # Jacobian (motion correction included)
             J = self.proj_detail.perspective_sensor_jacobian(sensor, ss)
 
-            ΔL = self.proj_detail.eval_primary_silhouette_radiance_difference(
+            ΔL, wavelengths = self.proj_detail.eval_primary_silhouette_radiance_difference(
                 scene, sampler, ss, sensor, active=active)
             active &= dr.any(ΔL != 0)
 
@@ -1128,7 +1132,7 @@ class PSIntegrator(ADIntegrator):
         block.set_coalesce(block.coalesce() and spp >= 4)
         block.put(
             pos=sensor_ds.uv,
-            wavelengths=[],
+            wavelengths=wavelengths,
             value=derivative * dr.rcp(mi.ScalarFloat(spp)),
             weight=0,
             alpha=1,
@@ -1140,14 +1144,28 @@ class PSIntegrator(ADIntegrator):
 
     #################### Indirect discontinuous derivatives ####################
 
-    def sample_radiance_difference(self, scene, ss, curr_depth, sampler, active):
+    def sample_radiance_difference(self, scene, ss, curr_depth, sampler,
+                                   wavelengths, active):
         """
         Sample the radiance difference of two rays that hit and miss the
         silhouette point `ss.p` with direction `ss.d`.
 
-        Parameters ``curr_depth`` (``mi.UInt32``):
+        Parameter ``scene`` (``mi.Scene``)
+            Reference to the scene being rendered in a differentiable manner.
+
+        Parameter ``ss`` (``mi.SilhouetteSample3f``)
+            Reference to the silhouette sample from which to built out the
+            boundary path.
+
+        Parameter ``curr_depth`` (``mi.UInt32``):
             The current depth of the boundary segment, including the boundary
             segment itself.
+
+        Parameter ``sampler`` (``mi.Sampler``):
+            A pre-seeded sample generator.
+
+        Parameter ``wavelengths`` (``mi.Wavelength``):
+            Set of sampled wavelengths to be used for the boundary path.
 
         This function returns a tuple ``(ΔL, active)`` where
 
@@ -1163,14 +1181,31 @@ class PSIntegrator(ADIntegrator):
                         'specialize the abstract PSIntegrator interface.')
 
     def sample_importance(self, scene, sensor, ss, max_depth, sampler,
-                          preprocess, active):
+                          wavelengths, preprocess, active):
         """
         Sample the incident importance at the silhouette point `ss.p` with
         direction `-ss.d`. If multiple connections to the sensor are valid, this
         method uses reservoir sampling to pick one.
 
+        Parameter ``scene`` (``mi.Scene``)
+            Reference to the scene being rendered in a differentiable manner.
+
+        Parameter ``ss`` (``mi.SilhouetteSample3f``)
+            Reference to the silhouette sample from which to built out the
+            boundary path.
+
         Parameters ``max_depth`` (``mi.UInt32``):
             The maximum number of ray segments to reach the sensor.
+
+        Parameter ``sampler`` (``mi.Sampler``):
+            A pre-seeded sample generator.
+
+        Parameter ``wavelengths`` (``mi.Wavelength``):
+            Set of sampled wavelengths to be used for the boundary path.
+
+        Parameter ``preprocess`` (``bool``):
+            Flag to indicate whether or not the motion of the boundary point
+            should be detached for this sample.
 
         The function returns a tuple ``(importance, uv, depth, boundary_p,
         valid)`` where
@@ -1209,7 +1244,7 @@ class PSIntegrator(ADIntegrator):
             sample, rcp_pdf_guiding = self.proj_detail.guiding_distr.sample(sampler)
 
             # Evaluate the discontinuous derivative integrand
-            value, sensor_uv = self.proj_detail.eval_indirect_integrand(
+            value, wavelengths, sensor_uv = self.proj_detail.eval_indirect_integrand(
                 scene, sensor, sample, sampler, preprocess=False)
             active = dr.any(value != 0)
 
@@ -1221,7 +1256,7 @@ class PSIntegrator(ADIntegrator):
             block.set_coalesce(block.coalesce() and spp >= 4)
             block.put(
                 pos=sensor_uv,
-                wavelengths=[],
+                wavelengths=wavelengths,
                 value=value,
                 weight=0,
                 alpha=1,

@@ -8,6 +8,7 @@
 #include <nanobind/stl/array.h>
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/pair.h>
+#include <drjit/python.h>
 
 /// Trampoline for derived types implemented in Python
 MI_VARIANT class PyVolume : public Volume<Float, Spectrum> {
@@ -54,14 +55,16 @@ public:
     std::string to_string() const override {
         NB_OVERRIDE(to_string);
     }
+
+    DR_TRAMPOLINE_TRAVERSE_CB(Volume)
 };
 
 MI_PY_EXPORT(Volume) {
     MI_PY_IMPORT_TYPES(Volume)
     using PyVolume = PyVolume<Float, Spectrum>;
-    using Properties = PropertiesV<Float>;
+    using Properties = mitsuba::Properties;
 
-    MI_PY_TRAMPOLINE_CLASS(PyVolume, Volume, Object)
+    auto volume = MI_PY_TRAMPOLINE_CLASS(PyVolume, Volume, Object)
         .def(nb::init<const Properties &>(), "props"_a)
         .def_method(Volume, resolution)
         .def_method(Volume, bbox)
@@ -96,5 +99,5 @@ MI_PY_EXPORT(Volume) {
             "it"_a, "active"_a = true,
             D(Volume, eval_n));
 
-    MI_PY_REGISTER_OBJECT("register_volume", Volume)
+    drjit::bind_traverse(volume);
 }

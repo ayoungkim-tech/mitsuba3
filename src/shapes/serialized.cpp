@@ -20,7 +20,7 @@ Serialized mesh loader (:monosp:`serialized`)
 
  * - filename
    - |string|
-   - Filename of the OBJ file that should be loaded
+   - Filename of the serialized file that should be loaded
 
  * - shape_index
    - |int|
@@ -239,8 +239,8 @@ public:
             Throw("Error while loading serialized file \"%s\": %s!", m_name, descr);
         };
 
-        auto fs = Thread::thread()->file_resolver();
-        fs::path file_path = fs->resolve(props.string("filename"));
+        auto fs = file_resolver();
+        fs::path file_path = fs->resolve(props.get<std::string_view>("filename"));
         m_name = file_path.filename().string();
 
         Log(Debug, "Loading mesh from \"%s\" ..", m_name);
@@ -431,9 +431,8 @@ public:
         }
     }
 
-    MI_DECLARE_CLASS()
+    MI_DECLARE_CLASS(SerializedMesh)
 };
 
-MI_IMPLEMENT_CLASS_VARIANT(SerializedMesh, Mesh)
-MI_EXPORT_PLUGIN(SerializedMesh, "Serialized mesh file")
+MI_EXPORT_PLUGIN(SerializedMesh)
 NAMESPACE_END(mitsuba)

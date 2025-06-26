@@ -55,6 +55,8 @@ public:
 
     using PhaseFunction::m_flags;
     using PhaseFunction::m_components;
+
+    DR_TRAMPOLINE_TRAVERSE_CB(PhaseFunction)
 };
 
 template <typename Ptr, typename Cls> void bind_phase_generic(Cls &cls) {
@@ -89,7 +91,7 @@ template <typename Ptr, typename Cls> void bind_phase_generic(Cls &cls) {
 MI_PY_EXPORT(PhaseFunction) {
     MI_PY_IMPORT_TYPES(PhaseFunction, PhaseFunctionContext, PhaseFunctionPtr)
     using PyPhaseFunction = PyPhaseFunction<Float, Spectrum>;
-    using Properties = PropertiesV<Float>;
+    using Properties = mitsuba::Properties;
 
     m.def("has_flag", [](uint32_t flags, PhaseFunctionFlags f) { return has_flag(flags, f); });
     m.def("has_flag", [](UInt32   flags, PhaseFunctionFlags f) { return has_flag(flags, f); });
@@ -113,6 +115,8 @@ MI_PY_EXPORT(PhaseFunction) {
             .def_field(PyPhaseFunction, m_flags, D(PhaseFunction, m_flags))
             .def("__repr__", &PhaseFunction::to_string);
 
+    drjit::bind_traverse(phase);
+
     bind_phase_generic<PhaseFunction *>(phase);
 
     if constexpr (dr::is_array_v<PhaseFunctionPtr>) {
@@ -121,5 +125,4 @@ MI_PY_EXPORT(PhaseFunction) {
         bind_phase_generic<PhaseFunctionPtr>(phase_ptr);
     }
 
-    MI_PY_REGISTER_OBJECT("register_phasefunction", PhaseFunction)
 }

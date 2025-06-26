@@ -10,9 +10,11 @@
 #include <mitsuba/core/util.h>
 #include <mitsuba/core/vector.h>
 #include <mitsuba/core/xml.h>
+#include <nanothread/nanothread.h>
 #include <mitsuba/render/integrator.h>
 #include <mitsuba/render/records.h>
 #include <mitsuba/render/scene.h>
+#include <functional>
 
 #if !defined(_WIN32)
 #  include <signal.h>
@@ -91,8 +93,11 @@ Options:
 )";
 }
 
-std::function<void(void)> develop_callback;
-std::mutex develop_callback_mutex;
+static std::function<void()> develop_callback_fn = nullptr;
+static void develop_callback() {
+    if (develop_callback_fn)
+        develop_callback_fn();
+}
 
 template <typename Float, typename Spectrum>
 void scene_static_accel_initialization() {
@@ -119,10 +124,7 @@ void render(Object *scene_, size_t sensor_i, fs::path filename) {
     if (!integrator)
         Throw("No integrator specified for scene: %s", scene);
 
-    /* critical section */ {
-        std::lock_guard<std::mutex> guard(develop_callback_mutex);
-        develop_callback = [&]() { film->write(filename); };
-    }
+    develop_callback_fn = [film]() { film->develop(); };
 
     integrator->render(scene, (uint32_t) sensor_i,
                        0 /* seed */,
@@ -130,10 +132,7 @@ void render(Object *scene_, size_t sensor_i, fs::path filename) {
                        false /* develop */,
                        true /* evaluate */);
 
-    /* critical section */ {
-        std::lock_guard<std::mutex> guard(develop_callback_mutex);
-        develop_callback = nullptr;
-    }
+    develop_callback_fn = nullptr;
 
     film->write(filename);
 }
@@ -143,15 +142,12 @@ void render(Object *scene_, size_t sensor_i, fs::path filename) {
 void hup_signal_handler(int signal) {
     if (signal != SIGHUP)
         return;
-    std::lock_guard<std::mutex> guard(develop_callback_mutex);
-    if (develop_callback)
-        develop_callback();
+    develop_callback();
 }
 #endif
 
 int main(int argc, char *argv[]) {
     Jit::static_initialization();
-    Class::static_initialization();
     Thread::static_initialization();
     Logger::static_initialization();
     Bitmap::static_initialization();
@@ -229,7 +225,7 @@ int main(int argc, char *argv[]) {
 #endif
 
         // Initialize nanothread with the requested number of threads
-        size_t thread_count = Thread::thread_count();
+        uint32_t thread_count = pool_size() + 1;
         if (*arg_threads) {
             thread_count = arg_threads->as_int();
             if (thread_count < 1) {
@@ -238,7 +234,7 @@ int main(int argc, char *argv[]) {
                 thread_count = 1;
             }
         }
-        Thread::set_thread_count(thread_count);
+        pool_set_size(nullptr, thread_count - 1);
 
         while (arg_define && *arg_define) {
             std::string value = arg_define->as_string();
@@ -314,7 +310,7 @@ int main(int argc, char *argv[]) {
 
         // Append the mitsuba directory to the FileResolver search path list
         ref<Thread> thread = Thread::thread();
-        ref<FileResolver> fr = thread->file_resolver();
+        ref<FileResolver> fr = file_resolver();
         fs::path base_path = util::library_path().parent_path();
         if (!fr->contains(base_path))
             fr->append(base_path);
@@ -329,9 +325,9 @@ int main(int argc, char *argv[]) {
         }
 
         if (!*arg_extra || *arg_help) {
-            help((int) Thread::thread_count());
+            help(pool_size() + 1);
         } else {
-            Log(Info, "%s", util::info_build((int) Thread::thread_count()));
+            Log(Info, "%s", util::info_build(pool_size() + 1));
             Log(Info, "%s", util::info_copyright());
             Log(Info, "%s", util::info_features());
 
@@ -343,7 +339,7 @@ int main(int argc, char *argv[]) {
         while (arg_extra && *arg_extra) {
             fs::path filename(arg_extra->as_string());
             ref<FileResolver> fr2 = new FileResolver(*fr);
-            thread->set_file_resolver(fr2);
+            set_file_resolver(fr2);
 
             // Add the scene file's directory to the search path.
             fs::path scene_dir = filename.parent_path();
@@ -351,7 +347,7 @@ int main(int argc, char *argv[]) {
                 fr2->append(scene_dir);
 
             if (*arg_output)
-                filename = arg_output->as_string();
+                filename = fs::path(arg_output->as_string());
 
             // Try and parse a scene from the passed file.
             std::vector<ref<Object>> parsed =
@@ -405,7 +401,6 @@ int main(int argc, char *argv[]) {
     StructConverter::static_shutdown();
     Logger::static_shutdown();
     Thread::static_shutdown();
-    Class::static_shutdown();
     Jit::static_shutdown();
 
 

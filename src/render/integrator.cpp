@@ -1,4 +1,5 @@
 #include <mutex>
+#include <atomic>
 
 #include <drjit/morton.h>
 #include <mitsuba/core/fwd.h>
@@ -8,6 +9,7 @@
 #include <mitsuba/core/timer.h>
 #include <mitsuba/core/util.h>
 #include <mitsuba/core/fstream.h>
+#include <nanothread/nanothread.h>
 #include <mitsuba/render/film.h>
 #include <mitsuba/render/integrator.h>
 #include <mitsuba/render/sampler.h>
@@ -19,8 +21,8 @@ NAMESPACE_BEGIN(mitsuba)
 
 // -----------------------------------------------------------------------------
 
-MI_VARIANT Integrator<Float, Spectrum>::Integrator(const Properties & props)
-    : m_stop(false), m_id(props.id()) {
+MI_VARIANT Integrator<Float, Spectrum>::Integrator(const Properties &props)
+    : JitObject<Integrator>(props.id()), m_stop(false) {
     m_timeout = props.get<ScalarFloat>("timeout", -1.f);
 
     // Disable direct visibility of emitters if needed
@@ -158,7 +160,7 @@ SamplingIntegrator<Float, Spectrum>::render(Scene *scene,
     TensorXf result;
     if constexpr (!dr::is_jit_v<Float>) {
         // Render on the CPU using a spiral pattern
-        uint32_t n_threads = (uint32_t) Thread::thread_count();
+        uint32_t n_threads = (uint32_t) (pool_size() + 1);
 
         Log(Info, "Starting render job (%ux%u, %u sample%s,%s %u thread%s)",
             film_size.x(), film_size.y(), spp, spp == 1 ? "" : "s",
@@ -185,7 +187,7 @@ SamplingIntegrator<Float, Spectrum>::render(Scene *scene,
 
         std::mutex mutex;
         ref<ProgressReporter> progress;
-        Logger* logger = mitsuba::Thread::thread()->logger();
+        Logger* logger = mitsuba::logger();
         if (logger && Info >= logger->log_level())
             progress = new ProgressReporter("Rendering");
 
@@ -199,11 +201,9 @@ SamplingIntegrator<Float, Spectrum>::render(Scene *scene,
         // Avoid overlaps in RNG seeding RNG when a seed is manually specified
         seed *= dr::prod(film_size);
 
-        ThreadEnvironment env;
         dr::parallel_for(
             dr::blocked_range<uint32_t>(0, total_blocks, grain_size),
             [&](const dr::blocked_range<uint32_t> &range) {
-                ScopedSetThreadEnvironment set_env(env);
                 // Fork a non-overlapping sampler for the current worker
                 ref<Sampler> sampler = sensor->sampler()->fork();
 
@@ -598,7 +598,7 @@ AdjointIntegrator<Float, Spectrum>::render(Scene *scene,
 
     TensorXf result;
     if constexpr (!dr::is_jit_v<Float>) {
-        size_t n_threads = Thread::thread_count();
+        size_t n_threads = pool_size() + 1;
 
         Log(Info, "Starting render job (%ux%u, %u sample%s,%s %u thread%s)",
             crop_size.x(), crop_size.y(), spp, spp == 1 ? "" : "s",
@@ -623,11 +623,9 @@ AdjointIntegrator<Float, Spectrum>::render(Scene *scene,
         // Start the render timer (used for timeouts & log messages)
         m_render_timer.reset();
 
-        ThreadEnvironment env;
         dr::parallel_for(
             dr::blocked_range<size_t>(0, total_samples, grain_size),
             [&](const dr::blocked_range<size_t> &range) {
-                ScopedSetThreadEnvironment set_env(env);
 
                 // Fork a non-overlapping sampler for the current worker
                 ref<Sampler> sampler = sensor->sampler()->clone();
@@ -761,11 +759,6 @@ AdjointIntegrator<Float, Spectrum>::render(Scene *scene,
 }
 
 // -----------------------------------------------------------------------------
-
-MI_IMPLEMENT_CLASS_VARIANT(Integrator, Object, "integrator")
-MI_IMPLEMENT_CLASS_VARIANT(SamplingIntegrator, Integrator)
-MI_IMPLEMENT_CLASS_VARIANT(MonteCarloIntegrator, SamplingIntegrator)
-MI_IMPLEMENT_CLASS_VARIANT(AdjointIntegrator, Integrator)
 
 MI_INSTANTIATE_CLASS(Integrator)
 MI_INSTANTIATE_CLASS(SamplingIntegrator)

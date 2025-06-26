@@ -54,7 +54,7 @@ static const constexpr double EARTH_MEAN_RADIUS = 6371.01;   // In km
 static const constexpr size_t ASTRONOMICAL_UNIT = 149597890; // In km
 
 /// Conversion constant to convert spectral solar luminosity to RGB
-static const constexpr float SPEC_TO_RGB_SUN_CONV = 467.069280386;
+static const constexpr float SPEC_TO_RGB_SUN_CONV = 467.069280386f;
 
 #define DATABASE_PATH "data/sunsky/"
 
@@ -544,7 +544,7 @@ build_tgmm_distribution(const DynamicBuffer<Float> &tgmm_tables,
  */
 template <typename FileType, typename OutType>
 DynamicBuffer<OutType> sunsky_array_from_file(const std::string &path) {
-    auto fs = Thread::thread()->file_resolver();
+    auto fs = mitsuba::file_resolver();
     fs::path file_path = fs->resolve(path);
     if (!fs::exists(file_path))
         Log(Error, "\"%s\": file does not exist!", file_path);

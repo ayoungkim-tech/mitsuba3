@@ -171,9 +171,9 @@ public:
         mark_dirty();
     }
 
-    void traverse(TraversalCallback *callback) override {
-        Base::traverse(callback);
-        callback->put_parameter("to_world", *m_to_world.ptr(), ParamFlags::Differentiable | ParamFlags::Discontinuous);
+    void traverse(TraversalCallback *cb) override {
+        Base::traverse(cb);
+        cb->put("to_world", m_to_world, ParamFlags::Differentiable | ParamFlags::Discontinuous);
     }
 
     void parameters_changed(const std::vector<std::string> &keys) override {
@@ -182,8 +182,21 @@ public:
             // modifying the scalar values of the fields in this class
             if constexpr (dr::is_jit_v<Float>)
                 dr::sync_thread();
-            // Update the scalar value of the matrix
-            m_to_world = m_to_world.value();
+
+            if constexpr (dr::is_diff_v<Float>) {
+                Transform4f to_world = m_to_world.value();
+                // Re-attach inverse_transpose to original matrix
+                if (dr::grad_enabled(to_world.matrix)) {
+                    Matrix4f invt_diff = dr::inverse_transpose(to_world.matrix);
+                    to_world.inverse_transpose =
+                        dr::replace_grad(to_world.inverse_transpose, invt_diff);
+                }
+                m_to_world = to_world;
+            } else {
+                // Update the scalar value of the matrix
+                m_to_world = m_to_world.value();
+            }
+
             update();
         }
 
@@ -201,6 +214,11 @@ public:
         return 4.f * dr::Pi<ScalarFloat> * dr::square(m_radius.value());
     }
 
+    /// Does this sphere have flipped normals?
+    bool has_flipped_normals() const override {
+        return m_flip_normals;
+    }
+
     // =============================================================
     //! @{ \name Sampling routines
     // =============================================================
@@ -212,7 +230,7 @@ public:
         Point3f local = warp::square_to_uniform_sphere(sample);
 
         PositionSample3f ps = dr::zeros<PositionSample3f>();
-        ps.p = dr::fmadd(local, m_radius.value(), m_center.value());
+        ps.p = m_to_world.value().transform_affine(local);
         ps.n = local;
 
         if (m_flip_normals)
@@ -221,7 +239,12 @@ public:
         ps.time = time;
         ps.delta = m_radius.value() == 0.f;
         ps.pdf = m_inv_surface_area;
-        ps.uv = sample;
+
+        Point2f angles = dir_to_sph(Vector3f(local));
+        Float theta = angles.x();
+        Float phi = angles.y();
+        dr::masked(phi, phi < 0.f) += 2.f * dr::Pi<Float>;
+        ps.uv = Point2f(phi * dr::InvTwoPi<Float>, theta * dr::InvPi<Float>);
 
         return ps;
     }
@@ -326,8 +349,11 @@ public:
     SurfaceInteraction3f eval_parameterization(const Point2f &uv,
                                                uint32_t ray_flags,
                                                Mask active) const override {
-        Point3f local = warp::square_to_uniform_sphere(uv);
-        Point3f p = dr::fmadd(local, m_radius.value(), m_center.value());
+        Float phi = uv.x() * dr::TwoPi<Float>;
+        Float theta = uv.y() * dr::Pi<Float>;
+
+        Point3f local = sph_to_dir(theta, phi);
+        Point3f p = m_to_world.value().transform_affine(local);
 
         Ray3f ray(p + local, -local, 0, Wavelength(0));
 
@@ -382,8 +408,14 @@ public:
 
         Point3f sample = dr::zeros<Point3f>(dr::width(ss));
         sample.x() = warp::tangent_direction_to_interval(ss.n, ss.d);
-        sample.y() = ss.uv.x();
-        sample.z() = ss.uv.y();
+
+        Float theta = ss.uv.y() * dr::Pi<Float>;
+        Float phi = ss.uv.x() * dr::TwoPi<Float>;
+        Vector3f local = sph_to_dir(theta, phi);
+
+        Point2f sample_square = warp::uniform_sphere_to_square(local);
+        sample.y() = sample_square.x();
+        sample.z() = sample_square.y();
 
         return sample;
     }
@@ -395,7 +427,10 @@ public:
         if constexpr (!dr::is_diff_v<Float>) {
             return si.p;
         } else {
-            Point3f local  = warp::square_to_uniform_sphere(dr::detach(si.uv));
+            Float phi = si.uv.x() * dr::TwoPi<Float>;
+            Float theta = si.uv.y() * dr::Pi<Float>;
+            Point3f local = dr::detach(sph_to_dir(theta, phi));
+
             Point3f p_diff = m_to_world.value().transform_affine(local);
 
             return dr::replace_grad(si.p, p_diff);
@@ -431,7 +466,13 @@ public:
         ss.p = dr::fmadd(OXd, radius, center);
         ss.d = dr::normalize(ss.p - viewpoint);
         ss.n = dr::normalize(ss.p - center);
-        ss.uv = warp::uniform_sphere_to_square(Vector3f(ss.n));
+
+        Point3f local = m_to_object.value().transform_affine(ss.p);
+        Point2f angles = dir_to_sph(Vector3f(local));
+        Float theta = angles.x();
+        Float phi = angles.y();
+        dr::masked(phi, phi < 0.f) += 2.f * dr::Pi<Float>;
+        ss.uv = Point2f(phi * dr::InvTwoPi<Float>, theta * dr::InvPi<Float>);
 
         Vector3f frame_t = dr::normalize(viewpoint - ss.p);
         ss.silhouette_d = dr::cross(ss.n, frame_t);
@@ -523,24 +564,18 @@ public:
         Value3 l = ray.o - center;
         Value3 d(ray.d);
         Value plane_t = dot(-l, d) / norm(d);
-
-        // Ray is perpendicular to plane
-        dr::mask_t<FloatP> no_hit =
-            plane_t == Value(0) && dr::all(ray.o != center);
-
         Value3 plane_p = ray(FloatP(plane_t));
 
-        // Intersection with plane outside of the sphere
-        no_hit &= (norm(plane_p - center) > radius);
-
+        // New origin for ray-sphere intersection
         Value3 o = plane_p - center;
 
+        // Solve ray-sphere intersection with new ray origin
         Value A = dr::squared_norm(d);
         Value B = dr::scalar_t<Value>(2.f) * dr::dot(o, d);
         Value C = dr::squared_norm(o) - dr::square(radius);
-
         auto [solution_found, near_t, far_t] = math::solve_quadratic(A, B, C);
 
+        // Adjust distances for plane intersection
         near_t += plane_t;
         far_t += plane_t;
 
@@ -550,11 +585,10 @@ public:
         // Sphere fully contains the segment of the ray
         dr::mask_t<FloatP> in_bounds = near_t < Value(0.0) && far_t > maxt;
 
-        active &= solution_found && !no_hit && !out_bounds && !in_bounds;
+        active &= solution_found && !out_bounds && !in_bounds;
 
-        FloatP t = dr::select(
-            active, dr::select(near_t < Value(0.0), FloatP(far_t), FloatP(near_t)),
-            dr::Infinity<FloatP>);
+        FloatP t = dr::select(near_t < Value(0.0), FloatP(far_t), FloatP(near_t));
+        t =  dr::select(active, t, dr::Infinity<FloatP>);
 
         return { t, dr::zeros<Point<FloatP, 2>>(), ((uint32_t) -1), 0 };
     }
@@ -673,17 +707,18 @@ public:
         si.t = dr::select(active, si.t, dr::Infinity<Float>);
 
         if (likely(need_uv)) {
-            Float rd_2  = dr::square(local.x()) + dr::square(local.y()),
-                  theta = unit_angle_z(local),
-                  phi   = dr::atan2(local.y(), local.x());
+            Point2f angles = dir_to_sph(Vector3f(local));
+            Float theta = angles.x();
+            Float phi = angles.y();
 
             dr::masked(phi, phi < 0.f) += 2.f * dr::Pi<Float>;
-
             si.uv = Point2f(phi * dr::InvTwoPi<Float>, theta * dr::InvPi<Float>);
+
             if (likely(need_dp_duv)) {
                 si.dp_du = Vector3f(-local.y(), local.x(), 0.f);
 
-                Float rd      = dr::sqrt(rd_2),
+                Float rd_2    = dr::square(local.x()) + dr::square(local.y()),
+                      rd      = dr::sqrt(rd_2),
                       inv_rd  = dr::rcp(rd),
                       cos_phi = local.x() * inv_rd,
                       sin_phi = local.y() * inv_rd;
@@ -712,6 +747,7 @@ public:
             si.dn_dv = si.dp_dv * inv_radius;
         }
 
+        si.prim_index = pi.prim_index;
         si.shape    = this;
         si.instance = nullptr;
 
@@ -738,8 +774,8 @@ public:
                                      (Vector<float, 3>) m_center.scalar(),
                                      (float) m_radius.scalar() };
 
-            jit_memcpy(JitBackend::CUDA, m_optix_data_ptr, &data,
-                       sizeof(OptixSphereData));
+            jit_memcpy_async(JitBackend::CUDA, m_optix_data_ptr, &data,
+                             sizeof(OptixSphereData));
         }
     }
 #endif
@@ -756,7 +792,7 @@ public:
         return oss.str();
     }
 
-    MI_DECLARE_CLASS()
+    MI_DECLARE_CLASS(Sphere)
 private:
     /// Center in world-space
     field<Point3f> m_center;
@@ -766,8 +802,9 @@ private:
     Float m_inv_surface_area;
 
     bool m_flip_normals;
+
+    MI_TRAVERSE_CB(Base, m_center, m_radius, m_inv_surface_area)
 };
 
-MI_IMPLEMENT_CLASS_VARIANT(Sphere, Shape)
-MI_EXPORT_PLUGIN(Sphere, "Sphere intersection primitive");
+MI_EXPORT_PLUGIN(Sphere)
 NAMESPACE_END(mitsuba)

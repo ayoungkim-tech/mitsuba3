@@ -32,6 +32,11 @@ class ProjectiveDetail():
         Precompute the silhouette of the scene as seen from the sensor and store
         the result in this python class.
         """
+        if dr.flag(dr.JitFlag.FreezingScope):
+            raise RuntimeError(
+                "Initializing the primary visible silhouette inside a frozen"
+                "function is not yet supported."
+            )
         self.primary_indices = []
         self.primary_distributions = []
 
@@ -173,11 +178,18 @@ class ProjectiveDetail():
             ds, _ = sensor.sample_direction(it, mi.Point2f(0), active)
             visible &= ds.pdf != 0
 
+            # Sample wavelengths
+            wavelength_sample = 0
+            if mi.is_spectral:
+                wavelength_sample = sampler.next_1d()
+            wavelengths, weight = sensor.sample_wavelengths(
+                dr.zeros(mi.SurfaceInteraction3f),  wavelength_sample, active)
+
             # Estimate the radiance difference along that path
             radiance_diff, _ = self.parent.sample_radiance_difference(
-                scene, ss, 0, sampler, visible)
+                scene, ss, 0, sampler, wavelengths, visible)
 
-        return radiance_diff
+        return radiance_diff * weight, wavelengths
 
     #####################################################################
     ##               Indirect discontinuous derivatives                ##
@@ -301,7 +313,7 @@ class ProjectiveDetail():
             # GridGuiding - Sample uniform points in [0, 1]^3
             sample_3 = self.guiding_distr.random_cell_sample(sampler)
             # GridGuiding - Evaluate point contribution
-            value, _ = self.eval_indirect_integrand(
+            value, _, _ = self.eval_indirect_integrand(
                 scene, sensor, sample_3, sampler, preprocess=True)
             value = dr.max(value)  # dr.max over channels
             res += value
@@ -349,7 +361,7 @@ class ProjectiveDetail():
             idx = self.guiding_distr.sample_to_cell_idx(sample_3, active_seed)
 
             # GridGuiding - Evaluate point contribution
-            value, _ = self.eval_indirect_integrand(
+            value, _, _ = self.eval_indirect_integrand(
                 scene, sensor, sample_3, sampler, preprocess=True, active=active_seed)
             value = dr.max(value)  # dr.max over channels
 
@@ -448,9 +460,9 @@ class ProjectiveDetail():
             active_guide = mi.Mask(True)
 
         # OctreeGuiding - Evaluate point contribution
-        value, _ = self.eval_indirect_integrand(
+        value, _, _ = self.eval_indirect_integrand(
             scene, sensor, sample_3, sampler, preprocess=True, active=active_guide)
-        value[dr.isinf(value)] = 0
+        value = dr.select(dr.isinf(value), mi.Spectrum(0), value)
         value = dr.max(value)
 
         # Estimate mass threshold for the current scene once
@@ -537,6 +549,10 @@ class ProjectiveDetail():
         Output ``result`` (``mi.Spectrum``):
             The integrand of the indirect discontinuous derivatives.
 
+        Output ``wavelengths`` (``mi.Wavelength``):
+            Set of wavelength used by this sample. (Only relevant in spectral
+            variants)
+
         Output ``sensor_uv`` (``mi.Point2f``):
             The UV coordinates on the sensor film to splat the result to. If
             ``preprocess`` is false, this coordinate is not used.
@@ -555,24 +571,31 @@ class ProjectiveDetail():
             ss = scene.sample_silhouette(sample, self.discontinuity_flags, active)
             active &= ss.is_valid()
 
+            # Sample wavelengths
+            wavelength_sample = 0
+            if mi.is_spectral:
+                wavelength_sample = sampler.next_1d()
+            wavelengths, weight = sensor.sample_wavelengths(
+                dr.zeros(mi.SurfaceInteraction3f),  wavelength_sample, active)
+
             # Estimate the importance
             fS, sensor_uv, sensor_depth, shading_p, active_i = parent.sample_importance(
-                scene, sensor, ss, parent.max_depth, sampler, preprocess, active)
+                scene, sensor, ss, parent.max_depth, sampler, wavelengths, preprocess, active)
             active &= active_i
 
             # Estimate the radiance difference
             fE, active_e = parent.sample_radiance_difference(
-                scene, ss, sensor_depth - 1, sampler, active)
+                scene, ss, sensor_depth - 1, sampler, wavelengths, active)
             active &= active_e
 
             # Local boundary term without the local speed term
             fB = ss.foreshortening
 
-            result = dr.select(active, fS * fB * fE * dr.rcp(ss.pdf), 0)
+            result = dr.select(active, weight * fS * fB * fE * dr.rcp(ss.pdf), 0)
 
         # Compute the motion of the boundary segment if this is not a preprocess
         if preprocess: # TODO cleanup
-            return dr.abs(result), mi.Point2f(0)
+            return dr.abs(result), wavelengths, mi.Point2f(0)
         else:
             si = dr.zeros(mi.SurfaceInteraction3f)
             si.p = ss.p
@@ -582,7 +605,7 @@ class ProjectiveDetail():
 
             motion = dr.dot(dr.detach(ss.n), (x_b_follow - shading_p))
             result = dr.select(active, result * motion, 0)
-            return result, sensor_uv
+            return result, wavelengths, sensor_uv
 
 
     #####################################################################
@@ -824,26 +847,41 @@ class ProjectiveDetail():
             shape's projection algorithm.
             """
             #TODO pass discontinuity flags as an option
-            def noop(*args,**kwargs):
+            def noop(*args, **kwargs):
                 return dr.zeros(mi.SilhouetteSample3f)
 
-            max_idx = mi.ShapeType.Other.value
-            projection_funcs = [noop] * max_idx
+            scene_shape_types = scene.shape_types()
+            funcs = []
 
-            projection_funcs[mi.ShapeType.Mesh.value] = self.project_mesh
-            projection_funcs[mi.ShapeType.BSplineCurve.value] = self.project_curve
-            projection_funcs[mi.ShapeType.Cylinder.value] = self.project_cylinder
-            projection_funcs[mi.ShapeType.Disk.value] = self.project_disk
-            projection_funcs[mi.ShapeType.Rectangle.value] = self.project_rectangle
-            projection_funcs[mi.ShapeType.SDFGrid.value] = self.project_sdf
-            projection_funcs[mi.ShapeType.Sphere.value] = self.project_sphere
+            # Map ShapeType values (which are bit flags) to contiguous indices
+            def compute_index(shape_type):
+                # Some shapes (e.g. rectangle) have multiple bits set. Use
+                # lzcnt to detect the most significant one
+                return 31 - dr.lzcnt(shape_type)
+
+            # Register a shape type
+            def put(shape_type, cb):
+                index = compute_index(shape_type)
+                while index >= len(funcs):
+                    funcs.append(noop)
+                # Ignore shapes that aren't present in the scene
+                if scene_shape_types & shape_type == shape_type:
+                    funcs[index] = cb
+
+            put(mi.ShapeType.Mesh, self.project_mesh)
+            put(mi.ShapeType.Rectangle, self.project_rectangle)
+            put(mi.ShapeType.BSplineCurve, self.project_curve)
+            put(mi.ShapeType.Cylinder, self.project_cylinder)
+            put(mi.ShapeType.Disk, self.project_disk)
+            put(mi.ShapeType.SDFGrid, self.project_sdf)
+            put(mi.ShapeType.Sphere, self.project_sphere)
 
             shape_types = si_guide.shape.shape_type()
             state = mi.UInt64(sampler.next_1d() * mi.UInt64(0xFFFFFFFFFFFFFFFF))
 
             ss = dr.switch(
-                shape_types,
-                projection_funcs,
+                compute_index(shape_types),
+                funcs,
                 scene, ray_guide, si_guide, state, active
             )
             active &= ss.is_valid()
