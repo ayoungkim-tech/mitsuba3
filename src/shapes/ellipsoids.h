@@ -35,7 +35,7 @@ public:
     using BoolStorage   = DynamicBuffer<Mask>;
     using UInt32Storage = DynamicBuffer<UInt32>;
     using ArrayXf       = dr::DynamicArray<Float>;
-    using AttributesMap = std::unordered_map<std::string, FloatStorage>;
+    using AttributesMap = tsl::robin_map<std::string, FloatStorage, std::hash<std::string_view>, std::equal_to<>>;
 
     EllipsoidsData() { }
 
@@ -141,7 +141,7 @@ public:
 
             ScalarFloat scale_factor = props.get<ScalarFloat>("scale_factor", 1.f);
 
-            auto to_world = props.get<ScalarTransform4f>("to_world", ScalarTransform4f());
+            auto to_world = props.get<ScalarAffineTransform4f>("to_world", ScalarAffineTransform4f());
             auto [to_world_S, to_world_Q, to_world_T] = transform_decompose(to_world.matrix, 25);
             float to_world_scale = dr::mean(dr::diag(to_world_S));
 
@@ -150,7 +150,7 @@ public:
                 stream->read(buf.get(), el.struct_->size());
 
                 ScalarPoint3f center = dr::load<ScalarPoint3f>(buf.get());
-                center = to_world.transform_affine(center);
+                center = to_world * center;
 
                 ScalarPoint3f scale  = dr::load<ScalarPoint3f>(buf.get() + scale_offset);
                 scale = dr::exp(scale); // Scaling activation (exponential)
@@ -290,8 +290,8 @@ public:
 
     void traverse(TraversalCallback *cb) {
         cb->put("data", m_data, ParamFlags::Differentiable);
-        for (auto& [name, attr]: m_attributes)
-            cb->put(name, attr, ParamFlags::Differentiable);
+        for (auto it = m_attributes.begin(); it != m_attributes.end(); ++it)
+            cb->put(it.key(), it.value(), ParamFlags::Differentiable);
 
         cb->put("extent",                   m_extent_multiplier,        ParamFlags::ReadOnly);
         cb->put("extent_adaptive_clamping", m_extent_adaptive_clamping, ParamFlags::ReadOnly);
@@ -303,7 +303,7 @@ public:
 
         for (auto& [name, attr]: m_attributes) {
             if (dr::width(attr) % count() != 0)
-                Throw("Attribute \"%s\" must have the same number of entries as ellipsoids (%u vs %u)", name.c_str(), dr::width(attr), count());
+                Throw("Attribute \"%s\" must have the same number of entries as ellipsoids (%u vs %u)", name, dr::width(attr), count());
         }
 
         compute_extents();
@@ -324,7 +324,7 @@ public:
 
     size_t count() const { return dr::width(m_data) / EllipsoidStructSize; }
 
-    bool has_attribute(const std::string& name) const {
+    bool has_attribute(std::string_view name) const {
         if (m_attributes.find(name) != m_attributes.end())
             return true;
         if (name == "center" || name == "quaternion" || name == "scale")
@@ -332,7 +332,7 @@ public:
         return false;
     }
 
-    Float eval_attribute_1(const std::string& name,
+    Float eval_attribute_1(std::string_view name,
                            const SurfaceInteraction3f &si,
                            Mask active) const {
         const auto& it = m_attributes.find(name);
@@ -345,10 +345,10 @@ public:
         if (name == "extent")
             return extents<Float>(si.prim_index, active);
 
-        Throw("Unknown attribute %s!", name.c_str());
+        Throw("Unknown attribute %s!", name);
     }
 
-    Color3f eval_attribute_3(const std::string& name,
+    Color3f eval_attribute_3(std::string_view name,
                              const SurfaceInteraction3f &si,
                              Mask active) const {
         const auto& it = m_attributes.find(name);
@@ -366,7 +366,7 @@ public:
                 return ellipsoid.scale;
         }
 
-        Throw("Unknown attribute %s!", name.c_str());
+        Throw("Unknown attribute %s!", name);
     }
 
     /// Helper meta-template function to call the templated Float::gather_packet_ with a runtime size
@@ -390,7 +390,7 @@ public:
         }
     }
 
-    ArrayXf eval_attribute_x(const std::string& name,
+    ArrayXf eval_attribute_x(std::string_view name,
                              const SurfaceInteraction3f &si,
                              Mask active) const {
         const auto& it = m_attributes.find(name);
@@ -427,7 +427,7 @@ public:
             }
         }
 
-        Throw("Unknown attribute %s!", name.c_str());
+        Throw("Unknown attribute %s!", name);
     }
 
     /// Helper routine to extract the data for a given ellipsoid.

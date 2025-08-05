@@ -85,7 +85,7 @@ Ellipsoids (:monosp:`ellipsoids`)
      an opacity value for each ellipsoids, or a set of spherical harmonic coefficients
      as used in the :monosp:`volprim_rf_basic` integrator.
 
-This shape plugin defines a a point cloud of anisotropic ellipsoid primitives
+This shape plugin defines a point cloud of anisotropic ellipsoid primitives
 using specified centers, scales, and quaternions. It employs a closed-form
 ray-intersection formula with backface culling. Although it is slower than the
 :monosp:`ellipsoidsmesh` shape plugin, which uses tessellated ellipsoids for
@@ -219,14 +219,14 @@ public:
     //! @{ \name Attribute routines
     // =============================================================
 
-    Mask has_attribute(const std::string& name, Mask active) const override {
+    Mask has_attribute(std::string_view name, Mask active) const override {
         if (m_ellipsoids.has_attribute(name))
             return true;
 
         return Base::has_attribute(name, active);
     }
 
-    Float eval_attribute_1(const std::string& name,
+    Float eval_attribute_1(std::string_view name,
                            const SurfaceInteraction3f &si,
                            Mask active) const override {
         MI_MASK_ARGUMENT(active);
@@ -237,7 +237,7 @@ public:
         }
     }
 
-    Color3f eval_attribute_3(const std::string& name,
+    Color3f eval_attribute_3(std::string_view name,
                              const SurfaceInteraction3f &si,
                              Mask active) const override {
         MI_MASK_ARGUMENT(active);
@@ -248,7 +248,7 @@ public:
         }
     }
 
-    ArrayXf eval_attribute_x(const std::string& name,
+    ArrayXf eval_attribute_x(std::string_view name,
                              const SurfaceInteraction3f &si,
                              Mask active) const override {
         MI_MASK_ARGUMENT(active);

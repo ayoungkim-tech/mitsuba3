@@ -46,7 +46,7 @@ normal map with a value of :math:`(0,0,1)` everywhere causes no changes to the s
 3D normal directions into (nonnegative) color values suitable for this plugin, the mapping
 :math:`x \mapsto (x+1)/2` must be applied to each component.
 
-The following XML snippet describes a smooth mirror material affected by a normal map. Note the we set the
+The following XML snippet describes a smooth mirror material affected by a normal map. Note that we set the
 ``raw`` properties of the normal map ``bitmap`` object to ``true`` in order to disable the
 transformation from sRGB to linear encoding:
 
@@ -82,14 +82,11 @@ public:
     MI_IMPORT_TYPES(Texture)
 
     NormalMap(const Properties &props) : Base(props) {
-        for (auto &[name, obj] : props.objects(false)) {
-            auto bsdf = dynamic_cast<Base *>(obj.get());
-
-            if (bsdf) {
+        for (auto &prop : props.objects()) {
+            if (Base *bsdf = prop.try_get<Base>()) {
                 if (m_nested_bsdf)
                     Throw("Only a single BSDF child object can be specified.");
                 m_nested_bsdf = bsdf;
-                props.mark_queried(name);
             }
         }
         if (!m_nested_bsdf)
@@ -233,7 +230,7 @@ protected:
     ref<Base> m_nested_bsdf;
     ref<Texture> m_normalmap;
 
-    MI_TRAVERSE_CB(Base, m_nested_bsdf, m_normalmap);
+    MI_TRAVERSE_CB(Base, m_nested_bsdf, m_normalmap)
 };
 
 MI_EXPORT_PLUGIN(NormalMap);

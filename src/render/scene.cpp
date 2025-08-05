@@ -23,18 +23,21 @@ MI_VARIANT Scene<Float, Spectrum>::Scene(const Properties &props)
     : JitObject<Scene>(props.id()) {
     m_thread_reordering = props.get<bool>("allow_thread_reordering", true);
 
-    for (auto &[k, v] : props.objects()) {
-        Scene *scene           = dynamic_cast<Scene *>(v.get());
-        Shape *shape           = dynamic_cast<Shape *>(v.get());
+    for (auto &prop : props.objects()) {
+        ref<Object> v = prop.get<ref<Object>>();
+
         Mesh *mesh             = dynamic_cast<Mesh *>(v.get());
         Emitter *emitter       = dynamic_cast<Emitter *>(v.get());
         Sensor *sensor         = dynamic_cast<Sensor *>(v.get());
         Integrator *integrator = dynamic_cast<Integrator *>(v.get());
 
-        if (!scene)
+        if (Scene *scene = dynamic_cast<Scene *>(v.get())) {
+            // Skip nested scenes in children list
+        } else {
             m_children.push_back(v.get());
+        }
 
-        if (shape) {
+        if (Shape *shape = dynamic_cast<Shape *>(v.get())) {
             if (shape->is_emitter())
                 m_emitters.push_back(shape->emitter());
             if (shape->is_sensor())
@@ -307,6 +310,7 @@ Scene<Float, Spectrum>::sample_emitter_ray(Float time, Float sample1,
     } else if (emitter_count == 1) {
         std::tie(ray, weight) =
             m_emitters[0]->sample_ray(time, sample1, sample2, sample3, active);
+        emitter = m_emitters[0].get();
     } else {
         ray = dr::zeros<Ray3f>();
         weight = dr::zeros<Spectrum>();
@@ -639,9 +643,10 @@ void Scene<Float, Spectrum>::traverse_1_cb_ro(
     void *payload, drjit::detail::traverse_callback_ro fn) const {
 
     // Only traverse the scene for frozen functions, since accidentally
-    // traversing the scene in loops or vcalls can cause issues.
+    // traversing the scene in loops or vcalls can cause errors with variable
+    // size mismatches, and backpropagation of gradients.
     if (!jit_flag(JitFlag::EnableObjectTraversal))
-        return;
+    return;
 
     if constexpr (!std::is_same_v<Object, drjit::TraversableBase>)
         Object::traverse_1_cb_ro(payload, fn);
@@ -660,7 +665,8 @@ void Scene<Float, Spectrum>::traverse_1_cb_rw(
     void *payload, drjit::detail::traverse_callback_rw fn) {
 
     // Only traverse the scene for frozen functions, since accidentally
-    // traversing the scene in loops or vcalls can cause issues.
+    // traversing the scene in loops or vcalls can cause errors with variable
+    // size mismatches, and backpropagation of gradients.
     if (!jit_flag(JitFlag::EnableObjectTraversal))
         return;
 

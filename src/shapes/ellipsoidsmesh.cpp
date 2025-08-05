@@ -261,13 +261,13 @@ public:
         // data-structures that are not needed for this plugin!
     }
 
-    Mask has_attribute(const std::string& name, Mask active) const override {
+    Mask has_attribute(std::string_view name, Mask active) const override {
         if (m_ellipsoids.has_attribute(name))
             return true;
         return Base::has_attribute(name, active);
     }
 
-    Float eval_attribute_1(const std::string& name,
+    Float eval_attribute_1(std::string_view name,
                            const SurfaceInteraction3f &si,
                            Mask active) const override {
         MI_MASK_ARGUMENT(active);
@@ -278,7 +278,7 @@ public:
         }
     }
 
-    Color3f eval_attribute_3(const std::string& name,
+    Color3f eval_attribute_3(std::string_view name,
                              const SurfaceInteraction3f &si,
                              Mask active) const override {
         MI_MASK_ARGUMENT(active);
@@ -289,7 +289,7 @@ public:
         }
     }
 
-    ArrayXf eval_attribute_x(const std::string& name,
+    ArrayXf eval_attribute_x(std::string_view name,
                              const SurfaceInteraction3f &si,
                              Mask active) const override {
         MI_MASK_ARGUMENT(active);
@@ -341,10 +341,10 @@ private:
             auto ellipsoid = m_ellipsoids.template get_ellipsoid<Float>(idx);
             auto rot = dr::quat_to_matrix<Matrix3f>(ellipsoid.quat);
 
-            const Transform4f& to_world = Transform4f::translate(ellipsoid.center) *
-                                          Transform4f(rot) *
-                                          Transform4f::scale(ellipsoid.scale) *
-                                          Transform4f::scale(m_ellipsoids.template extents<Float>(idx));
+            const AffineTransform4f& to_world = AffineTransform4f::translate(ellipsoid.center) *
+                                          AffineTransform4f(rot) *
+                                          AffineTransform4f::scale(ellipsoid.scale) *
+                                          AffineTransform4f::scale(m_ellipsoids.template extents<Float>(idx));
 
             int nb_vertices = (int) m_shell_vertices.size();
             int nb_faces    = (int) m_shell_faces.size();
@@ -361,7 +361,7 @@ private:
             m_faces            = dr::empty<IndexStorage>(3 * m_face_count);
 
             for (int i = 0; i < nb_vertices; ++i) {
-                Point3f v = to_world.transform_affine(Point3f(m_shell_vertices[i]));
+                Point3f v = to_world * Point3f(m_shell_vertices[i]);
                 // Convert to 32-bit precision
                 using JitInputPoint3f = Point<dr::replace_scalar_t<Float, InputFloat>, 3>;
                 dr::scatter(m_vertex_positions, JitInputPoint3f(v), idx * nb_vertices + i);
@@ -401,19 +401,19 @@ private:
                 auto ellipsoid = m_ellipsoids.template get_ellipsoid<Float>(i);
                 auto rot = dr::quat_to_matrix<Matrix3f>(ellipsoid.quat);
 
-                const ScalarTransform4f &to_world =
-                    ScalarTransform4f::translate(ellipsoid.center) *
-                    ScalarTransform4f(rot) *
-                    ScalarTransform4f::scale(ellipsoid.scale) *
-                    ScalarTransform4f::scale(m_ellipsoids.template extents<Float>(i));
+                const ScalarAffineTransform4f &to_world =
+                    ScalarAffineTransform4f::translate(ellipsoid.center) *
+                    ScalarAffineTransform4f(rot) *
+                    ScalarAffineTransform4f::scale(ellipsoid.scale) *
+                    ScalarAffineTransform4f::scale(m_ellipsoids.template extents<Float>(i));
 
                 for (size_t j = 0; j < nb_vertices; ++j) {
-                    Point3f v = to_world.transform_affine(Point3f(m_shell_vertices[j]));
+                    Point3f v = to_world * Point3f(m_shell_vertices[j]);
                     for (size_t k = 0; k < 3; ++k)
                         m_vertex_positions[i * nb_vertices * 3 + j * 3 + k] = float(v[k]);
                 }
 
-                UInt32 offset = i * uint32_t(nb_vertices);
+                UInt32 offset = (uint32_t) i * uint32_t(nb_vertices);
                 for (size_t j = 0; j < nb_faces; ++j) {
                     Vector3u face = m_shell_faces[j];
                     for (size_t k = 0; k < 3; ++k)

@@ -60,7 +60,7 @@ timings specified for the `batch` sensor itself.
         'sensor1': {
             'type': 'perspective',
             'fov': 45,
-            'to_world': mi.ScalarTransform4f().look_at(
+            'to_world': mi.ScalarAffineTransform4f().look_at(
                 origin=[0, 0, 1],
                 target=[0, 0, 0],
                 up=[0, 1, 0]
@@ -69,7 +69,7 @@ timings specified for the `batch` sensor itself.
         'sensor2': {
             'type': 'perspective',
             'fov': 45,
-            'to_world': mi.ScalarTransform4f().look_at(
+            'to_world': mi.ScalarAffineTransform4f().look_at(
                 origin=[1, 0, 0],
                 target=[0, 0, 0],
                 up=[0, 1, 0]
@@ -91,23 +91,20 @@ public:
     MI_IMPORT_TYPES(Shape, SensorPtr)
 
     BatchSensor(const Properties &props) : Base(props) {
-        for (auto [unused, o] : props.objects()) {
-            ref<Base> sensor(dynamic_cast<Base *>(o.get()));
-            ref<Shape> shape(dynamic_cast<Shape *>(o.get()));
-
-            if (sensor) {
+        for (auto &prop : props.objects()) {
+            if (Base *sensor = prop.try_get<Base>()) {
                 m_sensors.push_back(sensor);
-            } else if (shape) {
+            } else if (Shape *shape = prop.try_get<Shape>()) {
                 if (shape->is_sensor()) {
                     /* Inner sensors only have a weak ref to any parent shape
                      * so make sure lifetime of shapes are at least that of 
                      * batch sensor */
                     m_shapes.push_back(shape);
                     m_sensors.push_back(shape->sensor());
-                }
-                else
+                } else {
                     Throw("BatchSensor: shapes can only be specified as "
                           "children if a sensor is associated with them!");
+                }
             }
         }
 

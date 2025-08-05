@@ -321,7 +321,7 @@ public:
             }
 
             if (has_diffuse) {
-                /* Diffuse scattering is modeled a a sequence of events:
+                /* Diffuse scattering is modeled as a sequence of events:
                    1) Specular refraction inside
                    2) Subsurface scattering
                    3) Specular refraction outside again
@@ -385,7 +385,7 @@ public:
 
             if (has_diffuse) {
                 UnpolarizedSpectrum diff = m_diffuse_reflectance->eval(si, active);
-                /* Diffuse scattering is modeled a a sequence of events:
+                /* Diffuse scattering is modeled as a sequence of events:
                    1) Specular refraction inside
                    2) Subsurface scattering
                    3) Specular refraction outside again
@@ -473,7 +473,7 @@ private:
     Float m_specular_sampling_weight;
 
     MI_TRAVERSE_CB(Base, m_diffuse_reflectance, m_specular_reflectance,
-                   m_alpha_u, m_alpha_v, m_eta, m_specular_sampling_weight);
+                   m_alpha_u, m_alpha_v, m_eta, m_specular_sampling_weight)
 };
 
 MI_EXPORT_PLUGIN(PolarizedPlastic)

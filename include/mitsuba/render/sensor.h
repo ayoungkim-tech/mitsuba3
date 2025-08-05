@@ -32,7 +32,7 @@ public:
      * wavelength, surface position, and direction. This function takes a given
      * time value and five uniformly distributed samples on the interval [0, 1]
      * and warps them so that the returned ray the profile. Any
-     * discrepancies between ideal and actual sampled profile are absorbed into
+     * discrepancies between ideal and actual sampled profiles are absorbed into
      * a spectral importance weight that is returned along with the ray.
      *
      * In contrast to \ref Endpoint::sample_ray(), this function returns
@@ -160,7 +160,7 @@ protected:
     ref<const Texture> m_srf;
     bool m_alpha;
 
-    MI_TRAVERSE_CB(Base, m_film, m_sampler, m_srf);
+    MI_TRAVERSE_CB(Base, m_film, m_sampler, m_srf)
 };
 
 //! @}
@@ -215,7 +215,7 @@ protected:
     ScalarFloat m_far_clip;
     Float m_focus_distance;
 
-    MI_TRAVERSE_CB(Base, m_focus_distance);
+    MI_TRAVERSE_CB(Base, m_focus_distance)
 };
 
 // ========================================================================
@@ -226,7 +226,7 @@ protected:
 extern MI_EXPORT_LIB double parse_fov(const Properties &props, double aspect);
 
 /// Helper function to create a perspective projection transformation matrix
-template <typename Float> Transform<Point<Float, 4>>
+template <typename Float> ProjectiveTransform<Point<Float, 4>>
 perspective_projection(const Vector<int, 2> &film_size,
                        const Vector<int, 2> &crop_size,
                        const Vector<int, 2> &crop_offset,
@@ -235,7 +235,7 @@ perspective_projection(const Vector<int, 2> &film_size,
 
     using Vector2f = Vector<Float, 2>;
     using Vector3f = Vector<Float, 3>;
-    using Transform4f = Transform<Point<Float, 4>>;
+    using ProjectiveTransform4f = ProjectiveTransform<Point<Float, 4>>;
 
     Vector2f film_size_f = Vector2f(film_size),
              rel_size    = Vector2f(crop_size) / film_size_f,
@@ -255,17 +255,17 @@ perspective_projection(const Vector<int, 2> &film_size,
      * 4+5. Translate and scale the coordinates once more to account
      *     for a cropping window (if there is any)
      */
-    return Transform4f::scale(
+    return ProjectiveTransform4f::scale(
                Vector3f(1.f / rel_size.x(), 1.f / rel_size.y(), 1.f)) *
-           Transform4f::translate(
+           ProjectiveTransform4f::translate(
                Vector3f(-rel_offset.x(), -rel_offset.y(), 0.f)) *
-           Transform4f::scale(Vector3f(-0.5f, -0.5f * aspect, 1.f)) *
-           Transform4f::translate(Vector3f(-1.f, -1.f / aspect, 0.f)) *
-           Transform4f::perspective(fov_x, near_clip, far_clip);
+           ProjectiveTransform4f::scale(Vector3f(-0.5f, -0.5f * aspect, 1.f)) *
+           ProjectiveTransform4f::translate(Vector3f(-1.f, -1.f / aspect, 0.f)) *
+           ProjectiveTransform4f::perspective(fov_x, near_clip, far_clip);
 }
 
 /// Helper function to create a orthographic projection transformation matrix
-template <typename Float> Transform<Point<Float, 4>>
+template <typename Float> AffineTransform<Point<Float, 4>>
 orthographic_projection(const Vector<int, 2> &film_size,
                         const Vector<int, 2> &crop_size,
                         const Vector<int, 2> &crop_offset,
@@ -273,7 +273,7 @@ orthographic_projection(const Vector<int, 2> &film_size,
 
     using Vector2f = Vector<Float, 2>;
     using Vector3f = Vector<Float, 3>;
-    using Transform4f = Transform<Point<Float, 4>>;
+    using AffineTransform4f = AffineTransform<Point<Float, 4>>;
 
     Vector2f film_size_f = Vector2f(film_size),
              rel_size    = Vector2f(crop_size) / film_size_f,
@@ -293,13 +293,13 @@ orthographic_projection(const Vector<int, 2> &film_size,
      * 4+5. Translate and scale the coordinates once more to account
      *     for a cropping window (if there is any)
      */
-    return Transform4f::scale(
+    return AffineTransform4f::scale(
                Vector3f(1.f / rel_size.x(), 1.f / rel_size.y(), 1.f)) *
-           Transform4f::translate(
+           AffineTransform4f::translate(
                Vector3f(-rel_offset.x(), -rel_offset.y(), 0.f)) *
-           Transform4f::scale(Vector3f(-0.5f, -0.5f * aspect, 1.f)) *
-           Transform4f::translate(Vector3f(-1.f, -1.f / aspect, 0.f)) *
-           Transform4f::orthographic(near_clip, far_clip);
+           AffineTransform4f::scale(Vector3f(-0.5f, -0.5f * aspect, 1.f)) *
+           AffineTransform4f::translate(Vector3f(-1.f, -1.f / aspect, 0.f)) *
+           AffineTransform4f::orthographic(near_clip, far_clip);
 }
 
 //! @}

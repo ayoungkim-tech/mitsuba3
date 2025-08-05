@@ -75,7 +75,7 @@ public:
 
         dr::make_opaque(m_position);
 
-        m_intensity = props.get_texture_d65<Texture>("intensity", 1.f);
+        m_intensity = props.get_emissive_texture<Texture>("intensity", 1.f);
 
         if (m_intensity->is_spatially_varying())
             Throw("Expected a non-spatially varying intensity spectra!");
@@ -207,7 +207,7 @@ private:
     ref<Texture> m_intensity;
     field<Point3f> m_position;
 
-    MI_TRAVERSE_CB(Base, m_intensity, m_position);
+    MI_TRAVERSE_CB(Base, m_intensity, m_position)
 };
 
 

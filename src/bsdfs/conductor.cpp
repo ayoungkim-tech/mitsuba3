@@ -229,8 +229,8 @@ public:
 
         std::string_view material = props.get<std::string_view>("material", "none");
         if (props.has_property("eta") || material == "none") {
-            m_eta = props.get_texture<Texture>("eta", 0.f);
-            m_k   = props.get_texture<Texture>("k",   1.f);
+            m_eta = props.get_unbounded_texture<Texture>("eta", 0.f);
+            m_k   = props.get_unbounded_texture<Texture>("k",   1.f);
             if (material != "none")
                 Throw("Should specify either (eta, k) or material, not both.");
         } else {
@@ -331,7 +331,7 @@ private:
     ref<Texture> m_specular_reflectance;
     ref<Texture> m_eta, m_k;
 
-    MI_TRAVERSE_CB(Base, m_specular_reflectance, m_eta, m_k);
+    MI_TRAVERSE_CB(Base, m_specular_reflectance, m_eta, m_k)
 };
 
 MI_EXPORT_PLUGIN(SmoothConductor)

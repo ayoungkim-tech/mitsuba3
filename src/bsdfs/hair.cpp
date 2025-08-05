@@ -1,7 +1,6 @@
 #include <mitsuba/core/properties.h>
 #include <mitsuba/core/spectrum.h>
 #include <mitsuba/core/warp.h>
-#include <mitsuba/core/xml.h>
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/fresnel.h>
 #include <mitsuba/render/texture.h>
@@ -173,7 +172,7 @@ public:
         m_eumelanin = props.get<ScalarFloat>("eumelanin", 1.3f);
         m_pheomelanin = props.get<ScalarFloat>("pheomelanin", 0.2f);
         if (props.has_property("sigma_a")) {
-            m_sigma_a = props.get_texture<Texture>("sigma_a");
+            m_sigma_a = props.get_unbounded_texture<Texture>("sigma_a");
             m_use_pigmentation = false;
         }
         m_scale = props.get<ScalarFloat>("scale", 1.f);

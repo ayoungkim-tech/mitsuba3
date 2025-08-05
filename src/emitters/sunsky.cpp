@@ -110,7 +110,7 @@ It uses the Hosek-Wilkie sun :cite:`HosekSun2013` and sky model
 the cost of path tracing the atmosphere.
 
 Internally, this emitter does not compute a bitmap of the sky-dome like an
-environment map, but evaluates the irradiance whenever it is needed.
+environment map, but evaluates the spectral radiance whenever it is needed.
 Consequently, sampling is done through a Truncated Gaussian Mixture Model
 pre-fitted to the given parameters :cite:`vitsas2021tgmm`.
 
@@ -123,7 +123,7 @@ losing information.
 
 Note that attaching a ``sunsky`` emitter to the scene introduces physical units
 into the rendering process of Mitsuba 3, which is ordinarily a unitless system.
-Specifically, the evaluated irradiance has units of power (:math:`W`) per
+Specifically, the evaluated spectral radiance has units of power (:math:`W`) per
 unit area (:math:`m^{-2}`) per steradian (:math:`sr^{-1}`) per unit wavelength
 (:math:`nm^{-1}`). As a consequence, your scene should be modeled in meters for
 this plugin to work properly.
@@ -168,7 +168,7 @@ public:
         FloatStorage albedo = extract_albedo(m_albedo);
 
         // ================= UPDATE ANGLES =================
-        Vector3f local_sun_dir = m_to_world.value().inverse().transform_affine(m_sun_dir);
+        Vector3f local_sun_dir = m_to_world.value().inverse() * m_sun_dir;
 
         m_sun_angles = dir_to_sph(local_sun_dir);
         m_sun_angles = { m_sun_angles.y(), m_sun_angles.x() }; // flip convention
@@ -262,20 +262,25 @@ public:
         if (m_albedo->is_spatially_varying())
             Log(Error, "Expected a non-spatially varying radiance spectra!");
 
-        #define CHANGED(word) string::contains(keys, "albedo")
+        #define CHANGED(word) string::contains(keys, word)
+
+        bool changed_atmosphere = keys.empty() || CHANGED("albedo") || CHANGED("turbidity");
+        bool changed_time_record = keys.empty() || (m_active_record && (
+                CHANGED("timezone") || CHANGED("year") ||
+                CHANGED("day") || CHANGED("month") || CHANGED("hour") ||
+                CHANGED("minute") || CHANGED("second") || CHANGED("latitude") ||
+                CHANGED("longitude")
+            ));
+        bool changed_sun_dir = (!m_active_record && CHANGED("sun_direction")) || changed_time_record;
+
 
         // Update sun angles
         Vector3f local_sun_dir;
-        if (m_active_record &&
-            (keys.empty() || CHANGED("timezone") || CHANGED("year") ||
-             CHANGED("day") || CHANGED("month") || CHANGED("hour") ||
-             CHANGED("minute") || CHANGED("second") || CHANGED("latitude") ||
-             CHANGED("longitude")))
-        {
+        if (changed_time_record) {
             local_sun_dir = sun_coordinates(m_time, m_location);
-            m_sun_dir = m_to_world.value().transform_affine(local_sun_dir);
-        } else {
-            local_sun_dir = m_to_world.value().inverse().transform_affine(m_sun_dir);
+            m_sun_dir = m_to_world.value() * local_sun_dir;
+        } else if (changed_sun_dir) {
+            local_sun_dir = m_to_world.value().inverse() * m_sun_dir;
         }
 
         m_sun_angles = dir_to_sph(local_sun_dir);
@@ -286,12 +291,7 @@ public:
         Float eta = 0.5f * dr::Pi<Float> - m_sun_angles.y();
 
         // Update sky
-        if (keys.empty() ||
-            CHANGED("albedo") || CHANGED("turbidity") ||
-            CHANGED("timezone") || CHANGED("year") || CHANGED("day") ||
-            CHANGED("month") || CHANGED("hour") || CHANGED("minute") || CHANGED("second") ||
-            CHANGED("latitude") || CHANGED("longitude")
-        ) {
+        if (changed_sun_dir || changed_atmosphere) {
             FloatStorage albedo = extract_albedo(m_albedo);
             m_sky_params = sky_radiance_params<SKY_DATASET_SIZE>(
                 m_sky_params_dataset, albedo, m_turbidity, eta);
@@ -300,18 +300,13 @@ public:
         }
 
         // Update sun
-        if (keys.empty() || CHANGED("albedo") || CHANGED("turbidity")) {
+        if (changed_atmosphere) {
             m_sun_radiance =
                 sun_params<SUN_DATASET_SIZE>(m_sun_rad_dataset, m_turbidity);
         }
 
-        // Update TGMM
-        if (keys.empty() ||
-            CHANGED("albedo") || CHANGED("turbidity") ||
-            CHANGED("timezone") || CHANGED("year") || CHANGED("day") ||
-            CHANGED("month") || CHANGED("hour") || CHANGED("minute") || CHANGED("second") ||
-            CHANGED("latitude") || CHANGED("longitude")
-        ) {
+        // Update TGMM (no dependance on albedo)
+        if (changed_sun_dir || CHANGED("turbidity")) {
             FloatStorage gaussian_params, mis_weights;
             std::tie(gaussian_params, mis_weights) =
                 build_tgmm_distribution<TGMM_DATA_SIZE>(m_tgmm_tables, m_turbidity, eta);
@@ -353,7 +348,7 @@ public:
         using SpecMask   = dr::mask_t<unpolarized_spectrum_t<Spectrum>>;
         using SpecUInt32 = dr::uint32_array_t<unpolarized_spectrum_t<Spectrum>>;
 
-        Vector3f local_wo = m_to_world.value().inverse().transform_affine(-si.wi);
+        Vector3f local_wo = m_to_world.value().inverse() * (-si.wi);
         Float cos_theta = Frame3f::cos_theta(local_wo),
               gamma = dr::unit_angle(Vector3f(m_local_sun_frame.n), local_wo);
 
@@ -429,7 +424,7 @@ public:
         );
         active &= Frame3f::cos_theta(d) >= 0.f;
         // Unlike \ref sample_direction, ray goes from the envmap toward the scene
-        Vector3f d_world = m_to_world.value().transform_affine(-d);
+        Vector3f d_world = m_to_world.value() * (-d);
 
         // 3. PDF
         Float sky_pdf, sun_pdf;
@@ -477,7 +472,7 @@ public:
         Float radius = dr::maximum(m_bsphere.radius, dr::norm(it.p - m_bsphere.center)),
               dist   = 2.f * radius;
 
-        Vector3f d = m_to_world.value().transform_affine(sample_dir);
+        Vector3f d = m_to_world.value() * sample_dir;
         DirectionSample3f ds = dr::zeros<DirectionSample3f>();
         ds.p = dr::fmadd(d, dist, it.p);
         ds.n = -d;
@@ -505,7 +500,7 @@ public:
                         Mask active) const override {
         MI_MASKED_FUNCTION(ProfilerPhase::EndpointEvaluate, active);
 
-        Vector3f local_dir = m_to_world.value().inverse().transform_affine(ds.d);
+        Vector3f local_dir = m_to_world.value().inverse() * ds.d;
         Float sky_pdf, sun_pdf;
         std::tie(sky_pdf, sun_pdf) = compute_pdfs(local_dir, true, active);
 
@@ -1025,7 +1020,7 @@ private:
         m_turbidity = turb;
         dr::make_opaque(m_turbidity);
 
-        m_sun_half_aperture = dr::deg_to_rad(0.5f * (float) props.get<ScalarFloat>("sun_aperture", 0.5358));
+        m_sun_half_aperture = dr::deg_to_rad(.5f * props.get<float>("sun_aperture", 0.5358f));
         if (m_sun_half_aperture <= 0.f || 0.5f * dr::Pi<Float> <= m_sun_half_aperture)
             Log(Error, "Invalid sun aperture angle: %f, must be in ]0, 90[ degrees!", dr::rad_to_deg(2 * m_sun_half_aperture));
 
@@ -1065,7 +1060,7 @@ private:
             if (dr::all(m_sun_dir.z() < 0))
                 Log(Warn, "The sun is below the horizon at the specified time and location!");
 
-            m_sun_dir = m_to_world.value().transform_affine(m_sun_dir);
+            m_sun_dir = m_to_world.value() * m_sun_dir;
         }
     }
 

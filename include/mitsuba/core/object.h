@@ -42,7 +42,7 @@ enum class ObjectType : uint32_t {
     /// Emits radiance, subclasses \ref Emitter
     Emitter,
 
-    /// Sensor,
+    /// Generates sample positions and directions, subclasses \ref Sampler
     Sampler,
 
     /// Denotes an arbitrary shape (including meshes)
@@ -157,6 +157,9 @@ public:
 
     /// Return an identifier of the current instance (or empty if none)
     virtual std::string_view id() const;
+
+    /// Set the identifier of the current instance (no-op if not supported)
+    virtual void set_id(std::string_view id);
 
     /// Return the C++ class name of this object (e.g. "SmoothDiffuse")
     virtual std::string_view class_name() const;
@@ -277,6 +280,9 @@ class JitObject : public Object {
 public:
     /// Return the identifier of this instance
     std::string_view id() const override { return m_id; }
+
+    /// Set the identifier of this instance
+    void set_id(std::string_view id) override { m_id = id; }
 
 protected:
     /// Constructor with ID and optional ObjectType

@@ -75,11 +75,11 @@ public:
             ScalarVector3f direction(dr::normalize(props.get<ScalarVector3f>("direction")));
             auto [up, unused] = coordinate_system(direction);
 
-            m_to_world = ScalarTransform4f::look_at(0.0f, ScalarPoint3f(direction), up);
+            m_to_world = ScalarAffineTransform4f::look_at(0.0f, ScalarPoint3f(direction), up);
             dr::make_opaque(m_to_world);
         }
 
-        m_irradiance = props.get_texture_d65<Texture>("irradiance", 1.f);
+        m_irradiance = props.get_emissive_texture<Texture>("irradiance", 1.f);
 
         if (m_irradiance->is_spatially_varying())
             Throw("Expected a non-spatially varying irradiance spectra!");
@@ -123,10 +123,10 @@ public:
 
         // 2. "Sample" directional component (fixed, no actual sampling required)
         const auto trafo = m_to_world.value();
-        Vector3f d_global = trafo.transform_affine(Vector3f{ 0.f, 0.f, 1.f });
+        Vector3f d_global = trafo * Vector3f{ 0.f, 0.f, 1.f };
 
         Vector3f perp_offset =
-            trafo.transform_affine(Vector3f{ offset.x(), offset.y(), 0.f });
+            trafo * Vector3f{ offset.x(), offset.y(), 0.f };
         Point3f origin = m_bsphere.center + (perp_offset - d_global) * m_bsphere.radius;
 
         // 3. Sample spectral component
@@ -150,7 +150,7 @@ public:
                      Mask active) const override {
         MI_MASKED_FUNCTION(ProfilerPhase::EndpointSampleDirection, active);
 
-        Vector3f d = m_to_world.value().transform_affine(Vector3f{ 0.f, 0.f, 1.f });
+        Vector3f d = m_to_world.value() * Vector3f{ 0.f, 0.f, 1.f };
         // Needed when the reference point is on the sensor, which is not part of the bbox
         Float radius = dr::maximum(m_bsphere.radius, dr::norm(it.p - m_bsphere.center));
         Float dist = 2.f * radius;
@@ -232,7 +232,7 @@ protected:
     ref<Texture> m_irradiance;
     ScalarBoundingSphere3f m_bsphere;
 
-    MI_TRAVERSE_CB(Base, m_irradiance);
+    MI_TRAVERSE_CB(Base, m_irradiance)
 };
 
 MI_EXPORT_PLUGIN(DirectionalEmitter)

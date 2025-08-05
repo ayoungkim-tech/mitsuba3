@@ -50,7 +50,7 @@ Note that the magnitude of the height field variations influences the scale of t
 
 
 The following XML snippet describes a rough plastic material affected by a bump
-map. Note the we set the ``raw`` properties of the bump map ``bitmap`` object to
+map. Note that we set the ``raw`` properties of the bump map ``bitmap`` object to
 ``true`` in order to disable the transformation from sRGB to linear encoding:
 
 .. tabs::
@@ -84,20 +84,15 @@ public:
     MI_IMPORT_TYPES(Texture)
 
     BumpMap(const Properties &props) : Base(props) {
-        for (auto &[name, obj] : props.objects(false)) {
-            auto bsdf = dynamic_cast<Base *>(obj.get());
-            if (bsdf) {
+        for (auto &prop : props.objects()) {
+            if (Base *bsdf = prop.try_get<Base>()) {
                 if (m_nested_bsdf)
                     Throw("Only a single BSDF child object can be specified.");
                 m_nested_bsdf = bsdf;
-                props.mark_queried(name);
-            }
-            auto texture = dynamic_cast<Texture *>(obj.get());
-            if (texture) {
+            } else if (Texture *texture = prop.try_get<Texture>()) {
                 if (m_nested_texture)
                     Throw("Only a single Texture child object can be specified.");
                 m_nested_texture = texture;
-                props.mark_queried(name);
             }
         }
         if (!m_nested_bsdf)
@@ -245,7 +240,7 @@ protected:
     ref<Texture> m_nested_texture;
     ref<Base> m_nested_bsdf;
 
-    MI_TRAVERSE_CB(Base, m_nested_texture, m_nested_bsdf);
+    MI_TRAVERSE_CB(Base, m_nested_texture, m_nested_bsdf)
 };
 
 MI_EXPORT_PLUGIN(BumpMap)

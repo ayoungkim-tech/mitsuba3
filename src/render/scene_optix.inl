@@ -316,7 +316,6 @@ const MiOptixConfig &init_optix_config(uint32_t shape_types) {
 }
 
 MI_VARIANT void Scene<Float, Spectrum>::accel_init_gpu(const Properties &props) {
-    DRJIT_MARK_USED(props);
     if constexpr (!dr::is_cuda_v<Float>)
         return;
 
@@ -330,8 +329,8 @@ MI_VARIANT void Scene<Float, Spectrum>::accel_init_gpu(const Properties &props) 
 
     // Check if another scene was passed to the constructor
     Scene *other_scene = nullptr;
-    for (auto &[k, v] : props.objects()) {
-        other_scene = dynamic_cast<Scene *>(v.get());
+    for (auto &prop : props.objects()) {
+        other_scene = prop.try_get<Scene>();
         if (other_scene)
             break;
     }
@@ -465,7 +464,7 @@ MI_VARIANT void Scene<Float, Spectrum>::accel_parameters_changed_gpu() {
 
             // Gather information about the instance acceleration structure to be built
             std::vector<OptixInstance> ias;
-            prepare_ias(s.context, m_shapes, 0, s.accel, 0u, ScalarTransform4f(), ias);
+            prepare_ias(s.context, m_shapes, 0, s.accel, 0u, ScalarAffineTransform4f(), ias);
 
             // Build a "master" IAS that contains all the GAS of the scene (meshes,
             // custom shapes, curves, ...)
