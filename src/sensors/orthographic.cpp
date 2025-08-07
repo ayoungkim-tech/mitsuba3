@@ -168,6 +168,11 @@ public:
         return { ray, wav_weight };
     }
 
+    ProjectiveTransform4f projection_transform() const override {
+        auto camera_to_sample = m_sample_to_camera.inverse();
+        return ProjectiveTransform4f(camera_to_sample.matrix);
+    }
+
     ScalarBoundingBox3f bbox() const override {
         ScalarPoint3f p = m_to_world.scalar() * ScalarPoint3f(0.f);
         return ScalarBoundingBox3f(p, p);

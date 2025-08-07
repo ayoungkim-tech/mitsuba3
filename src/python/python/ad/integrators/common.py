@@ -882,23 +882,31 @@ class PSIntegrator(ADIntegrator):
         self.sample_border_warning = True
 
 
-    def override_spp(self, integrator_spp: int, runtime_spp: int, sampler_spp: int):
+    def override_spp(self, integrator_spp: Optional[int], runtime_spp: int, sampler_spp: int):
         """
         Utility method to override the intergrator's spp value with the one
         received at runtime in `render`/`render_backward`/`render_forward`.
 
-        The runtime value is overriden only if it is 0 and if the integrator
-        has defined a spp value. If the integrator hasn't defined a value, the
-        sampler's spp is used.
+        Priority order:
+        1. If the integrator's spp is explicitly disabled (set to 0), use 0
+           regardless of runtime_spp.
+        2. Otherwise, prefer the runtime_spp value.
+        3. If runtime_spp is 0:
+            - Use integrator_spp if it is defined (not None).
+            - Otherwise, fall back to sampler_spp.
         """
-        out = runtime_spp
-        if runtime_spp == 0:
-            if integrator_spp is not None:
-                out = integrator_spp
+        if integrator_spp is not None and integrator_spp == 0:
+            # If spp is explicitly disabled (set to 0), do not override it with
+            # runtime_spp
+            return 0
+        else:
+            if runtime_spp == 0:
+                if integrator_spp is not None:
+                    return integrator_spp
+                else:
+                    return sampler_spp
             else:
-                out = sampler_spp
-
-        return out
+                return runtime_spp
 
     def render_ad(self,
                   scene: mi.Scene,
@@ -1105,7 +1113,7 @@ class PSIntegrator(ADIntegrator):
             active = ss.is_valid() & (ss.pdf > 0)
 
             # Jacobian (motion correction included)
-            J = self.proj_detail.perspective_sensor_jacobian(sensor, ss)
+            J = self.proj_detail.sensor_jacobian(sensor, ss)
 
             ΔL, wavelengths = self.proj_detail.eval_primary_silhouette_radiance_difference(
                 scene, sampler, ss, sensor, active=active)
@@ -1183,7 +1191,7 @@ class PSIntegrator(ADIntegrator):
                         'specialize the abstract PSIntegrator interface.')
 
     def sample_importance(self, scene, sensor, ss, max_depth, sampler,
-                          wavelengths, preprocess, active):
+                          wavelengths, active):
         """
         Sample the incident importance at the silhouette point `ss.p` with
         direction `-ss.d`. If multiple connections to the sensor are valid, this
@@ -1204,10 +1212,6 @@ class PSIntegrator(ADIntegrator):
 
         Parameter ``wavelengths`` (``mi.Wavelength``):
             Set of sampled wavelengths to be used for the boundary path.
-
-        Parameter ``preprocess`` (``bool``):
-            Flag to indicate whether or not the motion of the boundary point
-            should be detached for this sample.
 
         The function returns a tuple ``(importance, uv, depth, boundary_p,
         valid)`` where
@@ -1346,3 +1350,35 @@ def mis_weight(pdf_a, pdf_b):
     b2 = dr.square(pdf_b)
     w = a2 / (a2 + b2)
     return dr.detach(dr.select(dr.isfinite(w), w, 0))
+
+
+def solid_angle_to_area_jacobian(o: mi.Point3f,
+                                 p: mi.Point3f,
+                                 n: mi.Normal3f,
+                                 active: mi.Bool = True):
+    """
+    Computes the Jacobian determinant of the change of variables from solid
+    angle (dω) to surface area (dA) when reparameterizing the integration over
+    a surface.
+
+    Parameter ``o`` (``mi.Point3f``)
+        Origin point (e.g., shading point).
+
+    Parameter ``p`` (``mi.Point3f``)
+        Sampled point on the surface.
+
+    Parameter ``n`` (``mi.Normal3f``)
+        Normal at the sampled point.
+
+    Output:
+        The Jacobian determinant |∂A/∂ω| = (|dot(n, wi)| / ||p - o||^2)
+    """
+    d = p - o
+    d_squared = dr.squared_norm(d)
+    wo = dr.normalize(d)
+
+    cos_theta = dr.abs_dot(n, wo)
+    J = cos_theta / d_squared
+    J = dr.select(active, J, 1)
+
+    return J
