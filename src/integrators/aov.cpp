@@ -3,6 +3,9 @@
 #include <mitsuba/render/records.h>
 #include <mitsuba/render/sensor.h>
 #include <unordered_map>
+#include <mitsuba/core/string.h>
+#include <drjit/array.h>
+#include <sstream>
 
 NAMESPACE_BEGIN(mitsuba)
 
@@ -92,6 +95,7 @@ public:
 
     enum class AOVType {
         Albedo,
+        SpectralAlbedo,
         Depth,
         Position,
         UV,
@@ -109,6 +113,7 @@ public:
     AOVIntegrator(const Properties &props) : Base(props),
         m_integrator_aovs_count(0) {
         std::vector<std::string> tokens = string::tokenize(props.get<std::string_view>("aovs"));
+        std::cout << ">>>>>>>>> NEW AOVIntfrator VERSION >>>>>>>>>>>>>" << std::endl;
 
         // First pass: collect integrators and their RGBA channels
         std::vector<std::pair<std::string, Base*>> integrators_with_names;
@@ -139,12 +144,20 @@ public:
 
             if (item.size() != 2 || item[0].empty() || item[1].empty())
                 Log(Warn, "Invalid AOV specification: require <name>:<type> pair");
-
+            Log(Debug, "Parsing AOV type: %s", item[1].c_str());
             if (item[1] == "albedo") {
                 m_aov_types.push_back(AOVType::Albedo);
                 m_aov_names.push_back(item[0] + ".R");
                 m_aov_names.push_back(item[0] + ".G");
                 m_aov_names.push_back(item[0] + ".B");
+            } else if (item[1] == "spectral_albedo") {
+                m_aov_types.push_back(AOVType::SpectralAlbedo);
+                static constexpr size_t spectrum_channels = Spectrum::Size;
+                for (size_t i = 0; i < spectrum_channels; ++i) {
+                    std::ostringstream oss;
+                    oss << item[0] << "[" << i << "]";
+                    m_aov_names.push_back(oss.str());
+                }
             } else if (item[1] == "depth") {
                 m_aov_types.push_back(AOVType::Depth);
                 m_aov_names.push_back(item[0] + ".T");
@@ -264,6 +277,24 @@ public:
                         *aovs++ = rgb.b();
                     }
                     break;
+                
+                case AOVType::SpectralAlbedo: {
+                        if constexpr (is_spectral_v<Spectrum>) {
+                            Spectrum raw_spec = 0.f;
+                            if (dr::any_or<true>(si.is_valid())) {
+                                Mask valid = active && si.is_valid();
+                                BSDFPtr m_bsdf = si.bsdf(ray);
+                                raw_spec = m_bsdf->eval_diffuse_reflectance(si, valid);
+                            }
+
+                            static constexpr size_t spectrum_channels = Spectrum::Size;
+                            for (size_t i = 0; i < spectrum_channels; ++i)
+                                *aovs++ = raw_spec[i];
+                        } else {
+                            Throw("The 'spectral_albedo' AOV is only supported in spectral variants of Mitsuba.");
+                        }
+                    } break;
+                
                 case AOVType::Depth:
                     *aovs++ = dr::select(si.is_valid(), si.t, 0.f);
                     break;
