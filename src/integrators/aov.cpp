@@ -288,6 +288,7 @@ public:
                             }
 
                             static constexpr size_t spectrum_channels = Spectrum::Size;
+                            std::cout << "# of spectrum channels: " << Spectrum::Size << " VS "<<  raw_spec.size() << std::endl;
                             for (size_t i = 0; i < spectrum_channels; ++i)
                                 *aovs++ = raw_spec[i];
                         } else {
