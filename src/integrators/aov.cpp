@@ -113,7 +113,7 @@ public:
     AOVIntegrator(const Properties &props) : Base(props),
         m_integrator_aovs_count(0) {
         std::vector<std::string> tokens = string::tokenize(props.get<std::string_view>("aovs"));
-        std::cout << ">>>>>>>>> NEW AOVIntfrator VERSION >>>>>>>>>>>>>" << std::endl;
+        std::cout << ">>>>>>>>> NEW AOVIntegrator VERSION >>>>>>>>>>>>>" << std::endl;
 
         // First pass: collect integrators and their RGBA channels
         std::vector<std::pair<std::string, Base*>> integrators_with_names;
