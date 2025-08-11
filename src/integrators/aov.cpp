@@ -155,7 +155,7 @@ public:
                 static constexpr size_t spectrum_channels = Spectrum::Size;
                 for (size_t i = 0; i < spectrum_channels; ++i) {
                     std::ostringstream oss;
-                    oss << item[0] << "[" << i << "]";
+                    oss << item[0] << ".ch" << i;
                     m_aov_names.push_back(oss.str());
                 }
             } else if (item[1] == "depth") {
