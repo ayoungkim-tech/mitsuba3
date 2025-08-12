@@ -154,8 +154,16 @@ public:
                 m_aov_types.push_back(AOVType::SpectralAlbedo);
                 static constexpr size_t spectrum_channels = Spectrum::Size;
                 for (size_t i = 0; i < spectrum_channels; ++i) {
+                    // Refelectance value
                     std::ostringstream oss;
                     oss << item[0] << ".ch" << i;
+                    m_aov_names.push_back(oss.str());
+                }
+                
+                for (size_t i = 0; i < spectrum_channels; ++i) {
+                    // Wavelength channel
+                    std::ostringstream oss;
+                    oss << item[0] << "_lambda.ch" << i;
                     m_aov_names.push_back(oss.str());
                 }
             } else if (item[1] == "depth") {
@@ -281,16 +289,21 @@ public:
                 case AOVType::SpectralAlbedo: {
                         if constexpr (is_spectral_v<Spectrum>) {
                             Spectrum raw_spec = 0.f;
+                            Spectrum wl = 0.f;
                             if (dr::any_or<true>(si.is_valid())) {
                                 Mask valid = active && si.is_valid();
                                 BSDFPtr m_bsdf = si.bsdf(ray);
                                 raw_spec = m_bsdf->eval_diffuse_reflectance(si, valid);
+                                wl = si.wavelengths;
                             }
 
                             static constexpr size_t spectrum_channels = Spectrum::Size;
-                            std::cout << "# of spectrum channels: " << Spectrum::Size << " VS "<<  raw_spec.size() << std::endl;
+                            std::cout << "# of spectrum channels: default " << Spectrum::Size << " raw data "<<  raw_spec.size() << std::endl;
+
                             for (size_t i = 0; i < spectrum_channels; ++i)
-                                *aovs++ = raw_spec[i];
+                                *aovs++ = raw_spec[i];     // spectral albedo value
+                            for (size_t i = 0; i < spectrum_channels; ++i)
+                                 *aovs++ = wl[i]; // corresponding wavelength
                         } else {
                             Throw("The 'spectral_albedo' AOV is only supported in spectral variants of Mitsuba.");
                         }
