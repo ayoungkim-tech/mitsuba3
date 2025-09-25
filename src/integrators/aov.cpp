@@ -97,6 +97,7 @@ public:
     enum class AOVType {
         Albedo,
         SpectralAlbedo,
+        SpectralRadiance,
         Depth,
         Position,
         UV,
@@ -167,6 +168,13 @@ public:
                     oss << item[0] << "_lambda.ch" << i;
                     m_aov_names.push_back(oss.str());
                 }
+            } else if (item[1] == "spectral_radiance") {
+                    m_aov_types.push_back(AOVType::SpectralRadiance);
+                    static constexpr size_t spectrum_channels = Spectrum::Size;
+                    for (size_t i = 0; i < spectrum_channels; ++i)
+                        m_aov_names.push_back(item[0] + ".ch" + std::to_string(i));     // spectral radiance
+                    for (size_t i = 0; i < spectrum_channels; ++i)
+                        m_aov_names.push_back(item[0] + "_lambda.ch" + std::to_string(i)); // wavelengths
             } else if (item[1] == "depth") {
                 m_aov_types.push_back(AOVType::Depth);
                 m_aov_names.push_back(item[0] + ".T");
@@ -308,7 +316,34 @@ public:
                         } else {
                             Throw("The 'spectral_albedo' AOV is only supported in spectral variants of Mitsuba.");
                         }
-                    } break;
+                    } 
+                    break;
+                    
+                case AOVType::SpectralRadiance: {
+                        if constexpr (is_spectral_v<Spectrum>) {
+                            Spectrum spec = 0.f;
+                            Spectrum wl   = 0.f;
+
+                            if (dr::any_or<true>(si.is_valid())) {
+                                Mask valid = active && si.is_valid();
+                                auto [inner_spec, inner_mask] =
+                                    m_integrators[inner_idx]->sample(scene, sampler, ray, medium, aovs, valid);
+
+                                spec = inner_spec;          // final spectral radiance
+                                wl   = si.wavelengths;      // hero wavelengths
+                            }
+
+                            static constexpr size_t spectrum_channels = Spectrum::Size;
+
+                            for (size_t i = 0; i < spectrum_channels; ++i)
+                                *aovs++ = spec[i];          // store spectral radiance
+                            for (size_t i = 0; i < spectrum_channels; ++i)
+                                *aovs++ = wl[i];            // store wavelengths
+                        } else {
+                            Throw("The 'spectral_radiance' AOV is only supported in spectral variants of Mitsuba.");
+                        }
+                    }
+                    break;
                 
                 case AOVType::Depth:
                     *aovs++ = dr::select(si.is_valid(), si.t, 0.f);
