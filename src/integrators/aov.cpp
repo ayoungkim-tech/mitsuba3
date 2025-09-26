@@ -171,10 +171,16 @@ public:
             } else if (item[1] == "spectral_radiance") {
                     m_aov_types.push_back(AOVType::SpectralRadiance);
                     static constexpr size_t spectrum_channels = Spectrum::Size;
-                    for (size_t i = 0; i < spectrum_channels; ++i)
-                        m_aov_names.push_back(item[0] + ".ch" + std::to_string(i));     // spectral radiance
-                    for (size_t i = 0; i < spectrum_channels; ++i)
-                        m_aov_names.push_back(item[0] + "_lambda.ch" + std::to_string(i)); // wavelengths
+                    for (size_t i = 0; i < spectrum_channels; ++i) {
+                        std::ostringstream oss;
+                        oss << item[0] << ".ch" << i;
+                        m_aov_names.push_back(oss.str());
+                    }
+                    for (size_t i = 0; i < spectrum_channels; ++i) {
+                        std::ostringstream oss;
+                        oss << item[0] << "_lambda.ch" << i;
+                        m_aov_names.push_back(oss.str());
+                    }
             } else if (item[1] == "depth") {
                 m_aov_types.push_back(AOVType::Depth);
                 m_aov_names.push_back(item[0] + ".T");
@@ -307,8 +313,6 @@ public:
                             }
 
                             static constexpr size_t spectrum_channels = Spectrum::Size;
-                            std::cout << "# of spectrum channels: default " << Spectrum::Size << " raw data "<<  raw_spec.size() << std::endl;
-
                             for (size_t i = 0; i < spectrum_channels; ++i)
                                 *aovs++ = raw_spec[i];     // spectral albedo value
                             for (size_t i = 0; i < spectrum_channels; ++i)
@@ -326,14 +330,19 @@ public:
 
                             if (dr::any_or<true>(si.is_valid())) {
                                 Mask valid = active && si.is_valid();
-                                auto [inner_spec, inner_mask] =
+                                if (inner_idx > 0) {
+                                    // the IntegratorRGBA branch already
+                                    spec = result.first;
+                                } else {
+                                auto [inner_spec2, inner_mask2] =
                                     m_integrators[inner_idx]->sample(scene, sampler, ray, medium, aovs, valid);
-
-                                spec = inner_spec;          // final spectral radiance
+                                spec = inner_spec2;
+                                }
                                 wl   = si.wavelengths;      // hero wavelengths
                             }
 
                             static constexpr size_t spectrum_channels = Spectrum::Size;
+                            std::cout << "# of spectrum channels: default " << Spectrum::Size << " radiance data "<<  spec.size() << std::endl;
 
                             for (size_t i = 0; i < spectrum_channels; ++i)
                                 *aovs++ = spec[i];          // store spectral radiance
