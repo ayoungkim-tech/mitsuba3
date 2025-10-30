@@ -60,7 +60,6 @@ def test02_type_is_preserved(variant_scalar_rgb):
     assert p['prop_2'] == 2
 
     p['prop_7'] = [1, 2, 3]
-    print()
     assert type(p['prop_7']) is Array3f64
 
 
@@ -207,7 +206,8 @@ def test10_transforms3(variant_scalar_rgb):
     p = mi.Properties()
     p["transform"] = mi.ScalarTransform3d().translate([2,4])
 
-    assert type(p["transform"] is mi.ScalarTransform3d)
+    # In Python, transforms are always returned as 4x4
+    assert type(p["transform"]) is mi.ScalarTransform4d
 
 
 def test11_tensor(variant_scalar_rgb):
