@@ -137,6 +137,40 @@ class BitmapTexture final : public Texture<Float, Spectrum> {
 public:
     MI_IMPORT_TYPES(Texture)
 
+    /* Recap of numerical precision of lookup operations
+     *
+     * backend | variant | format   | accel  | behavior
+     * ==================================================================
+     * CUDA    | float   | fp16     | true   | fp16 storage, fp32* interp, accel
+     * CUDA    | float   | variant  | true   | fp32 storage, fp32* interp, accel
+     *
+     * CUDA    | float   | fp16     | false  | fp16 storage, fp32 interp, no accel
+     * CUDA    | float   | variant  | false  | fp32 storage, fp32 interp, no accel
+     *
+     * CUDA    | double  | fp16     | true   | fp16 storage, fp32* interp, accel
+     * CUDA    | double  | variant  | true   | fp64 storage, fp64  interp, no accel
+     *
+     * CUDA    | double  | fp16     | false  | fp16 storage, fp64 interp, no accel
+     * CUDA    | double  | variant  | false  | fp64 storage, fp64 interp, no accel
+     *
+     * \* Hardware-accelerated lookups are not exactly fp32 see:
+     *    https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#linear-filtering
+     *
+     * ------------------------------------------------------------------------
+     *
+     * CPU     | float   | fp16     | true   | fp16 storage, fp32 interp, no accel
+     * CPU     | float   | variant  | true   | fp32 storage, fp32 interp, no accel
+     *
+     * CPU     | float   | fp16     | false  | fp16 storage, fp32 interp, no accel
+     * CPU     | float   | variant  | false  | fp32 storage, fp32 interp, no accel
+     *
+     * CPU     | double  | fp16     | true   | fp16 storage, fp64 interp, no accel
+     * CPU     | double  | variant  | true   | fp64 storage, fp64 interp, no accel
+     *
+     * CPU     | double  | fp16     | false  | fp16 storage, fp64 interp, no accel
+     * CPU     | double  | variant  | false  | fp64 storage, fp64 interp, no accel
+     */
+
     BitmapTexture(const Properties &props) : Texture(props) {
         m_transform = props.get<ScalarAffineTransform3f>("to_uv", ScalarAffineTransform3f());
 
@@ -501,11 +535,7 @@ public:
                     fetch_values[1] = &f10;
                     fetch_values[2] = &f01;
                     fetch_values[3] = &f11;
-
-                    if (m_accel)
-                        m_texture.template eval_fetch<Float>(uv, fetch_values, active);
-                    else
-                        m_texture.template eval_fetch_nonaccel<Float>(uv, fetch_values, active);
+                    m_texture.template eval_fetch<Float>(uv, fetch_values, active);
                 } else { // 3 channels
                     Color3f v00, v10, v01, v11;
                     dr::Array<Float *, 4> fetch_values;
@@ -513,11 +543,7 @@ public:
                     fetch_values[1] = v10.data();
                     fetch_values[2] = v01.data();
                     fetch_values[3] = v11.data();
-
-                    if (m_accel)
-                        m_texture.template eval_fetch<Float>(uv, fetch_values, active);
-                    else
-                        m_texture.template eval_fetch_nonaccel<Float>(uv, fetch_values, active);
+                    m_texture.template eval_fetch<Float>(uv, fetch_values, active);
 
                     f00 = luminance(v00);
                     f10 = luminance(v10);
@@ -720,11 +746,7 @@ protected:
             fetch_values[1] = v10.data();
             fetch_values[2] = v01.data();
             fetch_values[3] = v11.data();
-
-            if (m_accel)
-                m_texture.template eval_fetch<Float>(uv, fetch_values, active);
-            else
-                m_texture.template eval_fetch_nonaccel<Float>(uv, fetch_values, active);
+            m_texture.template eval_fetch<Float>(uv, fetch_values, active);
 
             UnpolarizedSpectrum c00, c10, c01, c11, c0, c1;
             c00 = srgb_model_eval<UnpolarizedSpectrum>(v00, si.wavelengths);
@@ -745,10 +767,7 @@ protected:
             return dr::fmadd(w0.y(), c0, w1.y() * c1);
         } else {
             Color3f out;
-            if (m_accel)
-                m_texture.template eval<Float>(uv, out.data(), active);
-            else
-                m_texture.template eval_nonaccel<Float>(uv, out.data(), active);
+            m_texture.template eval<Float>(uv, out.data(), active);
 
             return srgb_model_eval<UnpolarizedSpectrum>(out, si.wavelengths);
         }
@@ -767,10 +786,7 @@ protected:
         Point2f uv = m_transform * si.uv;
 
         Float out;
-        if (m_accel)
-            m_texture.template eval<Float>(uv, &out, active);
-        else
-            m_texture.template eval_nonaccel<Float>(uv, &out, active);
+        m_texture.template eval<Float>(uv, &out, active);
 
         return out;
     }
@@ -788,10 +804,7 @@ protected:
         Point2f uv = m_transform * si.uv;
 
         Color3f out;
-        if (m_accel)
-            m_texture.template eval<Float>(uv, out.data(), active);
-        else
-            m_texture.template eval_nonaccel<Float>(uv, out.data(), active);
+        m_texture.template eval<Float>(uv, out.data(), active);
 
         return out;
     }

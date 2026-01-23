@@ -98,6 +98,7 @@ public:
         Albedo,
         SpectralAlbedo,
         SpectralRadiance,
+        SpectralRadiancePDF,
         Depth,
         Position,
         UV,
@@ -115,7 +116,7 @@ public:
     AOVIntegrator(const Properties &props) : Base(props),
         m_integrator_aovs_count(0) {
         std::vector<std::string> tokens = string::tokenize(props.get<std::string_view>("aovs"));
-        std::cout << ">>>>>>>>> NEW AOVIntegrator VERSION >>>>>>>>>>>>>" << std::endl;
+        std::cout << ">>>>>>>>> AOVIntegrator VERSION: UPDATED SPEC IMAGE >>>>>>>>>>>>>" << std::endl;
 
         // First pass: collect integrators and their RGBA channels
         std::vector<std::pair<std::string, Base*>> integrators_with_names;
@@ -179,6 +180,11 @@ public:
                     for (size_t i = 0; i < spectrum_channels; ++i) {
                         std::ostringstream oss;
                         oss << item[0] << "_lambda.ch" << i;
+                        m_aov_names.push_back(oss.str());
+                    }
+                    for (size_t i = 0; i < spectrum_channels; ++i) {
+                         std::ostringstream oss;
+                        oss << item[0] << "_pdf.ch" << i;
                         m_aov_names.push_back(oss.str());
                     }
             } else if (item[1] == "depth") {
@@ -250,6 +256,15 @@ public:
         SurfaceInteraction3f si =
             scene->ray_intersect(ray, (uint32_t) RayFlags::All, true, false, 0, 0, active);
         dr::masked(si, !si.is_valid()) = dr::zeros<SurfaceInteraction3f>();
+
+        Spectrum inner_spec = 0.f;
+        Mask inner_mask = false;
+
+        if (!m_integrators.empty()) {
+            auto [spec, mask] = m_integrators[0]->sample(scene, sampler, ray, medium, nullptr, active);
+            inner_spec = spec;
+            inner_mask = mask;
+        }
 
         auto spectrum_to_color3f = [](const Spectrum& spec, const Ray3f& ray, Mask active) {
             DRJIT_MARK_USED(active);
@@ -325,29 +340,29 @@ public:
                     
                 case AOVType::SpectralRadiance: {
                         if constexpr (is_spectral_v<Spectrum>) {
-                            Spectrum spec = 0.f;
+                            Spectrum weighted = 0.f;
                             Spectrum wl   = 0.f;
+                            Spectrum wl_pdf = 0.f;
 
-                            if (dr::any_or<true>(si.is_valid())) {
-                                Mask valid = active && si.is_valid();
-                                if (inner_idx > 0) {
-                                    // the IntegratorRGBA branch already
-                                    spec = result.first;
-                                } else {
-                                auto [inner_spec2, inner_mask2] =
-                                    m_integrators[inner_idx]->sample(scene, sampler, ray, medium, aovs, valid);
-                                spec = inner_spec2;
-                                }
-                                wl   = si.wavelengths;      // hero wavelengths
+                            if (dr::any_or<true>(inner_mask)) {
+                                Mask valid = active && inner_mask;
+                                
+                                // inner_spec = f(λ) / p(λ)
+                                wl = ray.wavelengths; //hero wavelengths
+                                wl_pdf = pdf_rgb_spectrum(wl); // probability density of wl
+                                // f(λ) = (f(λ)/p(λ)) * p(λ)
+                                weighted = inner_spec * wl_pdf; // spectral radiance
                             }
 
                             static constexpr size_t spectrum_channels = Spectrum::Size;
-                            std::cout << "# of spectrum channels: default " << Spectrum::Size << " radiance data "<<  spec.size() << std::endl;
+                            std::cout << "# of spectrum channels: default " << Spectrum::Size << " radiance data "<<  weighted.size() << std::endl;
 
                             for (size_t i = 0; i < spectrum_channels; ++i)
-                                *aovs++ = spec[i];          // store spectral radiance
+                                *aovs++ = weighted[i];          // f(λ)
                             for (size_t i = 0; i < spectrum_channels; ++i)
-                                *aovs++ = wl[i];            // store wavelengths
+                                *aovs++ = wl[i];            // λ
+                            for (size_t i = 0; i < spectrum_channels; ++i)
+                                *aovs++ = wl_pdf[i];     // p(λ)
                         } else {
                             Throw("The 'spectral_radiance' AOV is only supported in spectral variants of Mitsuba.");
                         }
@@ -434,19 +449,12 @@ public:
                     break;
 
                 case AOVType::IntegratorRGBA: {
-                    auto [inner_spec, inner_mask] 
-                        = m_integrators[inner_idx]->sample(scene, sampler, ray, medium, aovs, active);
-                    dr::disable_grad(inner_spec);
-
                     Color3f rgb = spectrum_to_color3f(inner_spec, ray, active);
 
-                    aovs += m_integrators[inner_idx]->aov_names().size();
                     *aovs_rgba_integrator++ = rgb.r();
                     *aovs_rgba_integrator++ = rgb.g();
                     *aovs_rgba_integrator++ = rgb.b();
                     *aovs_rgba_integrator++ = dr::select(inner_mask, Float(1.f), Float(0.f));
-                    if (inner_idx == 0)
-                        result = {inner_spec, inner_mask};
 
                     inner_idx++;
                 } break;
@@ -459,29 +467,36 @@ public:
     TensorXf render(Scene *scene,
                     Sensor *sensor,
                     UInt32 seed,
-                    uint32_t spp,
+                    uint32_t spp_total,
                     bool develop,
                     bool evaluate) override {
 
-        std::vector<TensorXf> inner_images;
-        for (auto& integrator : m_integrators) {
-            auto image = integrator->render(scene, sensor, seed, spp, develop, evaluate);
-            inner_images.push_back(image);
+        m_spp_aov_images.clear();
+        m_spp_aov_images.reserve(spp_total);
+
+        for (uint32_t s = 0; s < spp_total; ++s) {
+            TensorXf aovs_image = Base::render(scene, sensor, seed + s, 1, develop, evaluate);
+
+            size_t num_aovs = m_aov_names.size() - m_integrator_aovs_count;
+             if (develop)
+                aovs_image = get_channels_slice(aovs_image, aovs_image.shape(2) - num_aovs, num_aovs);
+
+            m_spp_aov_images.push_back(aovs_image);
         }
 
-        TensorXf aovs_image;
+        TensorXf final_aovs_image;
         {
-            aovs_image = Base::render(scene, sensor, seed, spp, develop, evaluate);
+            final_aovs_image = Base::render(scene, sensor, seed, spp_total, develop, evaluate);
 
             // AOVs image above includes film target inner integrator channels as well so get slice
             // just with AOVs
             size_t num_aovs = m_aov_names.size() - m_integrator_aovs_count;
             if (develop)
-                aovs_image = get_channels_slice(aovs_image, aovs_image.shape(2) - num_aovs, num_aovs);
+                final_aovs_image = get_channels_slice(final_aovs_image, final_aovs_image.shape(2) - num_aovs, num_aovs);
         }
 
         if (develop)
-            return merge_channels(inner_images, aovs_image);
+            return final_aovs_image;
 
         return {};
     }
@@ -538,7 +553,7 @@ public:
             size_t num_aovs = m_aov_names.size() - m_integrator_aovs_count;
             aovs_image = get_channels_slice(aovs_image, aovs_image.shape(2) - num_aovs, num_aovs);
 
-            dr::backward_from((aovs_image * aovs_grad).array(), (uint32_t) dr::ADFlag::ClearInterior);
+            dr::backward_from((aovs_image * aovs_grad).array(), dr::ADFlag::ClearInterior | dr::ADFlag::AllowNoGrad);
         }
 
         // Let inner integrators handle backwards differentiation for radiance
@@ -665,6 +680,7 @@ private:
     std::vector<AOVType> m_aov_types;
     std::vector<std::string> m_aov_names;
     std::vector<ref<Base>> m_integrators;
+    mutable std::vector<TensorXf> m_spp_aov_images;
 
     MI_TRAVERSE_CB(Base, m_integrators)
 };
