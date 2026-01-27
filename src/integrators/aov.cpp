@@ -116,7 +116,7 @@ public:
     AOVIntegrator(const Properties &props) : Base(props),
         m_integrator_aovs_count(0) {
         std::vector<std::string> tokens = string::tokenize(props.get<std::string_view>("aovs"));
-        std::cout << ">>>>>>>>> AOVIntegrator VERSION: UPDATED SPEC IMAGE >>>>>>>>>>>>>" << std::endl;
+        std::cout << ">>>>>>>>> AOVIntegrator VERSION: UPDATED SPEC IMAGE PDF >>>>>>>>>>>>>" << std::endl;
 
         // First pass: collect integrators and their RGBA channels
         std::vector<std::pair<std::string, Base*>> integrators_with_names;
@@ -349,14 +349,14 @@ public:
                                 
                                 // inner_spec = f(λ) / p(λ)
                                 wl = ray.wavelengths; //hero wavelengths
-                                wl_pdf = pdf_rgb_spectrum(wl); // probability density of wl
+                                for (size_t i = 0; i < Spectrum::Size; ++i) {
+                                    wl_pdf[i] = pdf_rgb_spectrum(wl[i]); // probability density of wl
+                                }
                                 // f(λ) = (f(λ)/p(λ)) * p(λ)
                                 weighted = inner_spec * wl_pdf; // spectral radiance
                             }
 
                             static constexpr size_t spectrum_channels = Spectrum::Size;
-                            std::cout << "# of spectrum channels: default " << Spectrum::Size << " radiance data "<<  weighted.size() << std::endl;
-
                             for (size_t i = 0; i < spectrum_channels; ++i)
                                 *aovs++ = weighted[i];          // f(λ)
                             for (size_t i = 0; i < spectrum_channels; ++i)
