@@ -347,13 +347,13 @@ public:
                             if (dr::any_or<true>(inner_mask)) {
                                 Mask valid = active && inner_mask;
                                 
-                                // inner_spec = f(λ) / p(λ)
+                                // inner_spec = f(λ) * p(λ)
                                 wl = ray.wavelengths; //hero wavelengths
                                 for (size_t i = 0; i < Spectrum::Size; ++i) {
                                     wl_pdf[i] = pdf_rgb_spectrum(wl[i]); // probability density of wl
                                 }
-                                // f(λ) = (f(λ)/p(λ)) * p(λ)
-                                weighted = inner_spec * wl_pdf; // spectral radiance
+                                // f(λ) = (f(λ)*p(λ)) / p(λ)
+                                weighted = inner_spec / wl_pdf; // spectral radiance
                             }
 
                             static constexpr size_t spectrum_channels = Spectrum::Size;
