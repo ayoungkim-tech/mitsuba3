@@ -116,7 +116,6 @@ public:
     AOVIntegrator(const Properties &props) : Base(props),
         m_integrator_aovs_count(0) {
         std::vector<std::string> tokens = string::tokenize(props.get<std::string_view>("aovs"));
-        std::cout << ">>>>>>>>> AOVIntegrator VERSION: UPDATED SPEC IMAGE PDF >>>>>>>>>>>>>" << std::endl;
 
         // First pass: collect integrators and their RGBA channels
         std::vector<std::pair<std::string, Base*>> integrators_with_names;
@@ -340,25 +339,27 @@ public:
                     
                 case AOVType::SpectralRadiance: {
                         if constexpr (is_spectral_v<Spectrum>) {
-                            Spectrum weighted = 0.f;
+                            UnpolarizedSpectrum spec_u = 0.f;
                             Spectrum wl   = 0.f;
                             Spectrum wl_pdf = 0.f;
 
                             if (dr::any_or<true>(inner_mask)) {
                                 Mask valid = active && inner_mask;
                                 
-                                // inner_spec = f(λ) * p(λ)
                                 wl = ray.wavelengths; //hero wavelengths
+
                                 for (size_t i = 0; i < Spectrum::Size; ++i) {
                                     wl_pdf[i] = pdf_rgb_spectrum(wl[i]); // probability density of wl
                                 }
-                                // f(λ) = (f(λ)*p(λ)) / p(λ)
-                                weighted = inner_spec / wl_pdf; // spectral radiance
+                                
+                                // inner_spec = f(λ) * p(λ)
+                                spec_u = unpolarized_spectrum(inner_spec);
+                                spec_u *= dr::select(wl_pdf != 0.f, dr::rcp(wl_pdf), 0.f);
                             }
 
                             static constexpr size_t spectrum_channels = Spectrum::Size;
                             for (size_t i = 0; i < spectrum_channels; ++i)
-                                *aovs++ = weighted[i];          // f(λ)
+                                *aovs++ = spec_u[i];
                             for (size_t i = 0; i < spectrum_channels; ++i)
                                 *aovs++ = wl[i];            // λ
                             for (size_t i = 0; i < spectrum_channels; ++i)
